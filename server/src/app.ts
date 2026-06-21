@@ -7,6 +7,8 @@ import path from 'path';
 import { errorHandler } from './middlewares/errorHandler';
 import { apiLimiter } from './middlewares/rateLimiter';
 import authRoutes from './modules/auth/auth.routes';
+import projectRoutes from './modules/projects/projects.routes';
+import { projectTasksRouter, tasksRouter } from './modules/tasks/tasks.routes';
 const app = express();
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
@@ -16,6 +18,9 @@ if (process.env.NODE_ENV !== 'test') app.use(morgan(process.env.NODE_ENV === 'pr
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api', apiLimiter);
 app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/projects/:projectId/tasks', projectTasksRouter);
+app.use('/api/tasks', tasksRouter);
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.use((_req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 app.use(errorHandler);

@@ -4,5 +4,7 @@ export function success<T>(res: Response, data: T, statusCode = 200, meta?: Meta
   return res.status(statusCode).json({ success: true, data, ...(meta && { meta }) });
 }
 export function error(res: Response, message: string, statusCode = 400, errors?: unknown): Response {
-  return res.status(statusCode).json({ success: false, message, ...(errors && { errors }) });
+  const body: Record<string, unknown> = { success: false, message };
+  if (errors !== undefined) body.errors = errors;
+  return res.status(statusCode).json(body);
 }
