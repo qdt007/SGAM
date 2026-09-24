@@ -10,7 +10,10 @@ services:
     plan: free # `starter` removes the 15-minute idle sleep, which the 08:00 reminder cron needs
     region: singapore
     rootDir: server
-    buildCommand: npm ci && npx prisma generate && npm run build
+    # --include=dev is required: NODE_ENV=production below makes npm set omit=dev, and the build
+    # needs typescript and the @types packages, which are devDependencies. They are compiled away
+    # before the service starts, so nothing extra ships at runtime.
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
     startCommand: npx prisma migrate deploy && node dist/server.js
     healthCheckPath: /health
     autoDeploy: true
