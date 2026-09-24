@@ -1,105 +1,143 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { FolderKanban, CheckSquare, Users, Clock, ArrowRight } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import { projectsApi } from '../../api/projectsApi';
+import { usersApi } from '../../api/usersApi';
 import { useAuthStore } from '../../stores/authStore';
+import { Page, PageHeader, Section, StatTile } from '../../components/ui/Page';
+import { EmptyState, ErrorState, SkeletonRows } from '../../components/ui/States';
+import { PROJECT_STATUS_BADGE } from '../../constants/taskStyles';
 import { cn } from '../../utils/cn';
-import { format } from 'date-fns';
-
-const STATUS_COLOR: Record<string, string> = {
-  PLANNING: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
-  ACTIVE: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  ON_HOLD: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  COMPLETED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  CANCELLED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-};
+import { formatRelative } from '../../utils/dateUtils';
 
 export function DashboardPage() {
   const { user } = useAuthStore();
-  const { data: projects = [], isLoading } = useQuery({
+
+  const {
+    data: projects = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ['projects'],
     queryFn: projectsApi.list,
   });
 
+  const { data: stats } = useQuery({
+    queryKey: ['users', 'me', 'stats'],
+    queryFn: usersApi.myStats,
+  });
+
   const totalTasks = projects.reduce((sum, p) => sum + (p._count?.tasks ?? 0), 0);
-  const totalMembers = new Set(projects.flatMap((p) => p.members?.map((m) => m.userId) ?? [])).size;
   const activeProjects = projects.filter((p) => p.status === 'ACTIVE').length;
 
-  const stats = [
-    { label: 'Projects', value: projects.length, icon: FolderKanban, color: 'text-primary-600 bg-primary-50 dark:bg-primary-900/30' },
-    { label: 'Active', value: activeProjects, icon: Clock, color: 'text-green-600 bg-green-50 dark:bg-green-900/30' },
-    { label: 'Total Tasks', value: totalTasks, icon: CheckSquare, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30' },
-    { label: 'Collaborators', value: totalMembers, icon: Users, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/30' },
-  ];
-
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold dark:text-white">
-          Welcome back, {user?.displayName?.split(' ')[0]} 👋
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">Here's what's happening across your projects.</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="card flex items-center gap-3">
-            <div className={cn('rounded-lg p-2', color)}>
-              <Icon size={18} />
-            </div>
-            <div>
-              <p className="text-xl font-bold dark:text-white">{isLoading ? '—' : value}</p>
-              <p className="text-xs text-gray-500">{label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold dark:text-white">Recent Projects</h2>
-          <Link to="/projects" className="text-sm text-primary-600 hover:underline flex items-center gap-1">
-            View all <ArrowRight size={14} />
+    <Page>
+      <PageHeader
+        title={`Welcome back, ${user?.displayName?.split(' ')[0] ?? ''}`}
+        description="Here's what's happening across your projects."
+        actions={
+          <Link to="/projects" className="btn-primary btn-sm">
+            <Icon icon="ph:plus" width={15} aria-hidden />
+            New project
           </Link>
+        }
+      />
+
+      <div className="stack">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile
+            label="Projects"
+            value={isLoading ? '—' : projects.length}
+            hint={`${activeProjects} active`}
+            icon="ph:folders-duotone"
+          />
+          <StatTile
+            label="Tasks"
+            value={isLoading ? '—' : totalTasks}
+            hint="across all projects"
+            icon="ph:check-square-duotone"
+          />
+          <StatTile
+            label="Assigned to you"
+            value={stats?.assigned ?? '—'}
+            hint={`${stats?.done ?? 0} completed`}
+            icon="ph:user-focus-duotone"
+            tone="accent"
+          />
+          <StatTile
+            label="Overdue"
+            value={stats?.overdue ?? '—'}
+            hint={stats?.overdue ? 'needs attention' : 'nothing late'}
+            icon="ph:warning-circle-duotone"
+            tone={stats?.overdue ? 'danger' : 'neutral'}
+          />
         </div>
 
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="card h-16 animate-pulse bg-gray-100 dark:bg-gray-800" />
-            ))}
+        <Section
+          title="Recent projects"
+          actions={
+            <Link to="/projects" className="btn-ghost btn-sm">
+              View all
+              <Icon icon="ph:arrow-right" width={14} aria-hidden />
+            </Link>
+          }
+        >
+          <div className="card-flush overflow-hidden">
+            {isError ? (
+              <ErrorState description="Your projects could not be loaded." onRetry={() => refetch()} compact />
+            ) : isLoading ? (
+              <SkeletonRows rows={4} />
+            ) : projects.length === 0 ? (
+              <EmptyState
+                icon="ph:folder-plus-duotone"
+                title="No projects yet"
+                description="Create your first project to start tracking work and contributions."
+                action={
+                  <Link to="/projects" className="btn-primary btn-sm">
+                    Create a project
+                  </Link>
+                }
+              />
+            ) : (
+              projects.slice(0, 6).map((project) => {
+                const badge = PROJECT_STATUS_BADGE[project.status];
+                return (
+                  <Link key={project.id} to={`/projects/${project.id}`} className="list-row group">
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
+                      style={{ backgroundColor: project.coverColor || '#C2410C' }}
+                      aria-hidden
+                    >
+                      {project.name[0].toUpperCase()}
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-base font-medium text-ink transition-colors group-hover:text-primary">
+                        {project.name}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-ink-subtle">
+                        {project._count?.tasks ?? 0} tasks · {project._count?.members ?? 0} members · updated{' '}
+                        {formatRelative(project.updatedAt)}
+                      </span>
+                    </span>
+
+                    <span className={cn('hidden shrink-0 sm:inline-flex', badge)}>
+                      {project.status.replace('_', ' ')}
+                    </span>
+                    <Icon
+                      icon="ph:caret-right"
+                      width={14}
+                      className="shrink-0 text-ink-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-ink-muted"
+                      aria-hidden
+                    />
+                  </Link>
+                );
+              })
+            )}
           </div>
-        ) : projects.length === 0 ? (
-          <div className="card text-center py-10">
-            <FolderKanban size={32} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-sm text-gray-500">No projects yet.</p>
-            <Link to="/projects" className="btn-primary mt-3 inline-flex">Create your first project</Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {projects.slice(0, 5).map((project) => (
-              <Link
-                key={project.id}
-                to={`/projects/${project.id}`}
-                className="card flex items-center gap-4 hover:border-primary-300 transition-colors group"
-              >
-                <div className="h-10 w-10 rounded-lg shrink-0 flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: project.coverColor || '#6366f1' }}>
-                  {project.name[0].toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate dark:text-white group-hover:text-primary-600">{project.name}</p>
-                  <p className="text-xs text-gray-500">{project._count?.tasks ?? 0} tasks · {project._count?.members ?? 0} members</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className={cn('badge text-xs', STATUS_COLOR[project.status])}>{project.status}</span>
-                  <span className="text-xs text-gray-400">{format(new Date(project.updatedAt), 'MMM d')}</span>
-                  <ArrowRight size={14} className="text-gray-400 group-hover:text-primary-500" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+        </Section>
       </div>
-    </div>
+    </Page>
   );
 }

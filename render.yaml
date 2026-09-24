@@ -1,0 +1,54 @@
+# Render blueprint for the API. The client is on Vercel (see client/vercel.json), the database
+# is a managed Postgres (Neon), and uploads go to Cloudinary — none of those are declared here.
+#
+# Values marked `sync: false` are NOT stored in git; set them in the Render dashboard
+# (Environment -> Add Environment Variable) before the first deploy. DEPLOY.md lists each one.
+services:
+  - type: web
+    name: pm-api
+    runtime: node
+    plan: free # `starter` removes the 15-minute idle sleep, which the 08:00 reminder cron needs
+    region: singapore
+    rootDir: server
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: Asia/Ho_Chi_Minh # node-cron reads the process clock; containers are UTC without this
+      - key: STORAGE_TYPE
+        value: cloudinary
+      - key: DATABASE_URL
+        sync: false # Neon pooled connection string, with ?sslmode=require
+      - key: CLIENT_URL
+        sync: false # https://<your-app>.vercel.app — no trailing slash, comma-separate extra domains
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: pm-uploads
+      # Optional — leave unset and the queues write/send directly, which is fine at this scale.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false

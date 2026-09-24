@@ -13,15 +13,15 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const get = asyncHandler(async (req: Request, res: Response) => {
-  success(res, await svc.getProject(req.params.id));
+  success(res, await svc.getProject(req.params.id, req.user!.userId));
 });
 
 export const update = asyncHandler(async (req: Request, res: Response) => {
-  success(res, await svc.updateProject(req.params.id, req.body));
+  success(res, await svc.updateProject(req.params.id, req.user!.userId, req.body));
 });
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-  await svc.deleteProject(req.params.id);
+  await svc.deleteProject(req.params.id, req.user!.userId);
   success(res, { message: 'Project deleted' });
 });
 

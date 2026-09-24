@@ -1,31 +1,22 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, FolderKanban, X, ArrowRight, Pencil, Trash2, MoreVertical } from 'lucide-react';
+import { Icon } from '@iconify/react';
+import { SelectField, PROJECT_STATUS_OPTIONS, PRIORITY_OPTIONS } from '../../components/ui/SelectField';
+import { Page, PageHeader } from '../../components/ui/Page';
+import { Modal, ConfirmDialog } from '../../components/ui/Modal';
+import { EmptyState, ErrorState, InlineError, Skeleton } from '../../components/ui/States';
+import { PROJECT_STATUS_BADGE, PRIORITY_DOT, PRIORITY_LABEL } from '../../constants/taskStyles';
 import { projectsApi } from '../../api/projectsApi';
+import { planLimitFrom } from '../../hooks/usePlan';
 import { cn } from '../../utils/cn';
-import { format } from 'date-fns';
+import { formatRelative } from '../../utils/dateUtils';
 import { Project } from '../../types';
 
-const STATUS_COLOR: Record<string, string> = {
-  PLANNING: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
-  ACTIVE: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  ON_HOLD: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  COMPLETED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  CANCELLED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-};
-
-const PRIORITY_COLOR: Record<string, string> = {
-  CRITICAL: 'text-red-600',
-  HIGH: 'text-orange-500',
-  MEDIUM: 'text-yellow-500',
-  LOW: 'text-green-500',
-};
-
-const COVER_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#06b6d4'];
+const COVER_COLORS = ['#C2410C', '#9A3412', '#D97706', '#F59E0B', '#16A34A', '#0F766E', '#78716C', '#1C1917'];
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -36,18 +27,22 @@ const projectSchema = z.object({
 });
 type ProjectForm = z.infer<typeof projectSchema>;
 
-function ProjectModal({
-  onClose,
-  project,
-}: {
-  onClose: () => void;
-  project?: Project;
-}) {
+const apiMessage = (e: unknown, fallback: string) =>
+  (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback;
+
+/* ─── Create / edit ──────────────────────────────── */
+function ProjectModal({ onClose, project }: { onClose: () => void; project?: Project }) {
   const qc = useQueryClient();
   const isEdit = !!project;
   const [selectedColor, setSelectedColor] = useState(project?.coverColor ?? COVER_COLORS[0]);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ProjectForm>({
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<ProjectForm>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       name: project?.name ?? '',
@@ -58,216 +53,304 @@ function ProjectModal({
   });
 
   const mutation = useMutation({
-    mutationFn: (data: Partial<Project>) =>
-      isEdit ? projectsApi.update(project.id, data) : projectsApi.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); onClose(); },
+    mutationFn: (data: Partial<Project>) => (isEdit ? projectsApi.update(project.id, data) : projectsApi.create(data)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      onClose();
+    },
   });
 
+  const planLimit = planLimitFrom(mutation.error);
   const onSubmit = (data: ProjectForm) => mutation.mutate({ ...data, coverColor: selectedColor });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="card w-full max-w-md shadow-2xl">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-lg dark:text-white">{isEdit ? 'Edit Project' : 'New Project'}</h2>
-          <button onClick={onClose} className="btn-ghost p-1"><X size={16} /></button>
+    <Modal
+      title={isEdit ? 'Edit project' : 'New project'}
+      description={isEdit ? undefined : 'Projects hold your tasks, members and contribution history.'}
+      onClose={onClose}
+    >
+      <form id="project-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {planLimit ? (
+          <div className="rounded-lg border border-primary/25 bg-primary/[0.06] px-3 py-2.5 text-small text-ink">
+            <p className="font-semibold text-primary">{planLimit.message}</p>
+            <Link to="/settings?tab=billing" onClick={onClose} className="btn-primary btn-sm mt-2.5">
+              <Icon icon="ph:sparkle-duotone" width={14} aria-hidden />
+              Xem gói Pro
+            </Link>
+          </div>
+        ) : (
+          <InlineError message={mutation.error ? apiMessage(mutation.error, 'Something went wrong') : null} />
+        )}
+
+        <div>
+          <label htmlFor="project-name" className="label">
+            Project name
+          </label>
+          <input
+            id="project-name"
+            {...register('name')}
+            className={cn('input', errors.name && 'input-invalid')}
+            placeholder="e.g. Capstone launch"
+            aria-invalid={!!errors.name}
+          />
+          {errors.name && <p className="field-error">{errors.name.message}</p>}
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {mutation.error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-              {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Something went wrong'}
-            </div>
-          )}
+        <div>
+          <label htmlFor="project-description" className="label">
+            Description
+          </label>
+          <textarea
+            id="project-description"
+            {...register('description')}
+            className="input resize-none"
+            rows={3}
+            placeholder="What is this project about?"
+          />
+        </div>
 
-          <div>
-            <label className="label">Project name *</label>
-            <input {...register('name')} className={cn('input', errors.name && 'border-red-400')} placeholder="My awesome project" />
-            {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <SelectField
+            label="Status"
+            value={watch('status') ?? 'PLANNING'}
+            onChange={(v) => setValue('status', v as ProjectForm['status'])}
+            options={PROJECT_STATUS_OPTIONS}
+          />
+          <SelectField
+            label="Priority"
+            value={watch('priority') ?? 'MEDIUM'}
+            onChange={(v) => setValue('priority', v as ProjectForm['priority'])}
+            options={PRIORITY_OPTIONS}
+          />
+        </div>
+
+        <div>
+          <span className="label">Cover colour</span>
+          <div className="flex flex-wrap gap-2">
+            {COVER_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setSelectedColor(c)}
+                aria-label={`Cover colour ${c}`}
+                aria-pressed={selectedColor === c}
+                className={cn(
+                  'h-7 w-7 rounded-full transition-transform duration-150 hover:scale-110',
+                  selectedColor === c && 'ring-2 ring-ink/70 ring-offset-2 ring-offset-surface',
+                )}
+                style={{ backgroundColor: c }}
+              />
+            ))}
           </div>
+        </div>
 
-          <div>
-            <label className="label">Description</label>
-            <textarea {...register('description')} className="input resize-none" rows={3} placeholder="What is this project about?" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Status</label>
-              <select {...register('status')} className="input">
-                <option value="PLANNING">Planning</option>
-                <option value="ACTIVE">Active</option>
-                <option value="ON_HOLD">On Hold</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Priority</label>
-              <select {...register('priority')} className="input">
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-                <option value="CRITICAL">Critical</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Cover color</label>
-            <div className="flex gap-2 flex-wrap">
-              {COVER_COLORS.map((c) => (
-                <button key={c} type="button" onClick={() => setSelectedColor(c)}
-                  className={cn('h-7 w-7 rounded-full border-2 transition-transform', selectedColor === c ? 'border-gray-800 scale-110 dark:border-white' : 'border-transparent')}
-                  style={{ backgroundColor: c }} />
-              ))}
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 justify-center">
-              {isSubmitting ? (isEdit ? 'Saving...' : 'Creating...') : (isEdit ? 'Save Changes' : 'Create Project')}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function DeleteConfirmModal({ project, onClose }: { project: Project; onClose: () => void }) {
-  const qc = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: () => projectsApi.delete(project.id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); onClose(); },
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="card w-full max-w-sm shadow-2xl">
-        <h2 className="font-semibold text-lg dark:text-white mb-1">Delete Project</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Are you sure you want to delete <span className="font-medium text-gray-800 dark:text-white">"{project.name}"</span>? This will also delete all tasks. This action cannot be undone.
-        </p>
-        {mutation.error && (
-          <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-            {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to delete'}
-          </div>
-        )}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="btn-secondary flex-1 justify-center">Cancel</button>
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            className="flex-1 justify-center px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
-          >
-            {mutation.isPending ? 'Deleting...' : 'Delete'}
+        <div className="modal-footer">
+          <button type="button" onClick={onClose} className="btn-secondary btn-sm">
+            Cancel
+          </button>
+          <button type="submit" disabled={isSubmitting} className="btn-primary btn-sm">
+            {isSubmitting && <Icon icon="ph:circle-notch" width={14} className="animate-spin" aria-hidden />}
+            {isEdit ? 'Save changes' : 'Create project'}
           </button>
         </div>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }
 
+/* ─── Card ───────────────────────────────────────── */
 function ProjectCard({ project }: { project: Project }) {
+  const qc = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [menuOpen]);
+
+  const remove = useMutation({
+    mutationFn: () => projectsApi.delete(project.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      setShowDelete(false);
+    },
+  });
+
+  const done = 0; // progress needs task data; the detail page owns that view
 
   return (
     <>
-      <div className="card flex flex-col hover:border-primary-300 transition-colors group relative">
-        <div className="h-2 rounded-t-xl -mx-4 -mt-4 mb-4" style={{ backgroundColor: project.coverColor || '#6366f1' }} />
-
-        {/* Action menu */}
-        <div className="absolute top-3 right-3">
+      <article className="card-interactive group relative flex flex-col p-0">
+        <div className="absolute right-2.5 top-2.5 z-10" ref={menuRef}>
           <button
-            onClick={(e) => { e.preventDefault(); setMenuOpen(!menuOpen); }}
-            className="opacity-0 group-hover:opacity-100 btn-ghost p-1 rounded-lg transition-opacity"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={`Actions for ${project.name}`}
+            aria-haspopup="menu"
+            className="btn-ghost btn-icon-sm opacity-0 transition-opacity duration-150 focus-visible:opacity-100 group-hover:opacity-100"
           >
-            <MoreVertical size={14} />
+            <Icon icon="ph:dots-three-bold" width={16} aria-hidden />
           </button>
           {menuOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-6 z-20 w-36 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 overflow-hidden">
-                <button
-                  onClick={() => { setMenuOpen(false); setShowEdit(true); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <Pencil size={13} /> Edit
-                </button>
-                <button
-                  onClick={() => { setMenuOpen(false); setShowDelete(true); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 size={13} /> Delete
-                </button>
-              </div>
-            </>
+            <div role="menu" className="menu absolute right-0 top-9 w-36">
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setShowEdit(true);
+                }}
+                className="menu-item"
+              >
+                <Icon icon="ph:pencil-simple" width={15} aria-hidden /> Edit
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setShowDelete(true);
+                }}
+                className="menu-item text-danger hover:bg-danger/10"
+              >
+                <Icon icon="ph:trash" width={15} aria-hidden /> Delete
+              </button>
+            </div>
           )}
         </div>
 
-        <Link to={`/projects/${project.id}`} className="flex flex-col flex-1">
-          <div className="flex items-start justify-between gap-2 pr-6">
-            <h3 className="font-semibold text-sm dark:text-white group-hover:text-primary-600 truncate">{project.name}</h3>
-            <span className={cn('badge text-xs shrink-0', STATUS_COLOR[project.status])}>{project.status}</span>
+        <Link to={`/projects/${project.id}`} className="flex flex-1 flex-col p-5">
+          <div className="mb-3 flex items-center gap-2.5">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-md font-semibold text-white"
+              style={{ backgroundColor: project.coverColor || '#C2410C' }}
+              aria-hidden
+            >
+              {project.name[0].toUpperCase()}
+            </span>
+            <span className="min-w-0 flex-1 pr-7">
+              <span className="block truncate text-md font-semibold text-ink transition-colors group-hover:text-primary">
+                {project.name}
+              </span>
+              <span className={cn('mt-1 inline-flex', PROJECT_STATUS_BADGE[project.status])}>
+                {project.status.replace('_', ' ')}
+              </span>
+            </span>
           </div>
-          {project.description && (
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{project.description}</p>
-          )}
-          <div className="mt-auto pt-3 flex items-center justify-between">
-            <div className="flex gap-3 text-xs text-gray-500">
-              <span>{project._count?.tasks ?? 0} tasks</span>
-              <span>{project._count?.members ?? 0} members</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className={cn('text-xs font-medium', PRIORITY_COLOR[project.priority])}>{project.priority}</span>
-              <ArrowRight size={12} className="text-gray-400 group-hover:text-primary-500" />
-            </div>
+
+          <p className="line-clamp-2 min-h-[2.5rem] text-sm text-ink-muted">
+            {project.description || <span className="text-ink-subtle">No description</span>}
+          </p>
+
+          <div className="mt-4 flex items-center gap-3 border-t border-line-soft pt-3 text-xs text-ink-subtle">
+            <span className="inline-flex items-center gap-1">
+              <Icon icon="ph:check-square" width={13} aria-hidden />
+              {project._count?.tasks ?? done} tasks
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Icon icon="ph:users" width={13} aria-hidden />
+              {project._count?.members ?? 0}
+            </span>
+            <span
+              className="ml-auto inline-flex items-center gap-1.5"
+              title={`Priority: ${PRIORITY_LABEL[project.priority]}`}
+            >
+              <span className={cn('h-1.5 w-1.5 rounded-full', PRIORITY_DOT[project.priority])} aria-hidden />
+              {PRIORITY_LABEL[project.priority]}
+            </span>
           </div>
-          <p className="text-xs text-gray-400 mt-2">Updated {format(new Date(project.updatedAt), 'MMM d, yyyy')}</p>
+
+          <p className="mt-2 text-2xs text-ink-subtle">Updated {formatRelative(project.updatedAt)}</p>
         </Link>
-      </div>
+      </article>
 
       {showEdit && <ProjectModal project={project} onClose={() => setShowEdit(false)} />}
-      {showDelete && <DeleteConfirmModal project={project} onClose={() => setShowDelete(false)} />}
+      {showDelete && (
+        <ConfirmDialog
+          title="Delete project"
+          message={
+            <>
+              Deleting <span className="font-medium text-ink">{project.name}</span> also deletes its tasks, comments and
+              attachments. This cannot be undone.
+            </>
+          }
+          loading={remove.isPending}
+          onConfirm={() => remove.mutate()}
+          onClose={() => setShowDelete(false)}
+        />
+      )}
     </>
   );
 }
 
+/* ─── Page ───────────────────────────────────────── */
 export function ProjectsListPage() {
   const [showCreate, setShowCreate] = useState(false);
-  const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: projectsApi.list });
+  const {
+    data: projects = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ['projects'],
+    queryFn: projectsApi.list,
+  });
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold dark:text-white">Projects</h1>
-          <p className="text-sm text-gray-500 mt-1">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
-        </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary">
-          <Plus size={16} /> New Project
-        </button>
-      </div>
+    <Page>
+      <PageHeader
+        title="Projects"
+        description={
+          isLoading ? 'Loading your projects…' : `${projects.length} project${projects.length === 1 ? '' : 's'}`
+        }
+        actions={
+          <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
+            <Icon icon="ph:plus" width={15} aria-hidden />
+            New project
+          </button>
+        }
+      />
 
-      {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => <div key={i} className="card h-40 animate-pulse bg-gray-100 dark:bg-gray-800" />)}
+      {isError ? (
+        <div className="card-flush">
+          <ErrorState description="Your projects could not be loaded." onRetry={() => refetch()} />
+        </div>
+      ) : isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="card space-y-3">
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="h-9 w-9 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3.5 w-2/3" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-4/5" />
+            </div>
+          ))}
         </div>
       ) : projects.length === 0 ? (
-        <div className="card text-center py-16">
-          <FolderKanban size={40} className="mx-auto text-gray-300 mb-3" />
-          <h3 className="font-medium text-gray-700 dark:text-gray-300">No projects yet</h3>
-          <p className="text-sm text-gray-500 mt-1">Create your first project to get started.</p>
-          <button onClick={() => setShowCreate(true)} className="btn-primary mt-4 inline-flex">
-            <Plus size={16} /> New Project
-          </button>
+        <div className="card-flush">
+          <EmptyState
+            icon="ph:folder-plus-duotone"
+            title="No projects yet"
+            description="A project is where your group's tasks, files and contribution history live."
+            action={
+              <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
+                <Icon icon="ph:plus" width={15} aria-hidden />
+                Create your first project
+              </button>
+            }
+          />
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
             <ProjectCard key={project.id} project={project} />
           ))}
@@ -275,6 +358,6 @@ export function ProjectsListPage() {
       )}
 
       {showCreate && <ProjectModal onClose={() => setShowCreate(false)} />}
-    </div>
+    </Page>
   );
 }

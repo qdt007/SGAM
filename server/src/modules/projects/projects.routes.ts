@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/authenticate';
 import { authorizeProject } from '../../middlewares/authorize';
 import { validate } from '../../middlewares/validate';
+import { enforceProjectQuota, enforceMemberQuota } from '../../middlewares/requirePlan';
 import * as ctrl from './projects.controller';
 import { createProjectSchema, updateProjectSchema, addMemberSchema, updateMemberSchema, createColumnSchema, updateColumnSchema } from './projects.schema';
 
@@ -10,13 +11,13 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', ctrl.list);
-router.post('/', validate(createProjectSchema), ctrl.create);
+router.post('/', enforceProjectQuota, validate(createProjectSchema), ctrl.create);
 router.get('/:id', authorizeProject('OWNER', 'MANAGER', 'MEMBER', 'VIEWER'), ctrl.get);
 router.patch('/:id', authorizeProject('OWNER', 'MANAGER'), validate(updateProjectSchema), ctrl.update);
 router.delete('/:id', authorizeProject('OWNER'), ctrl.remove);
 
 router.get('/:projectId/members', authorizeProject('OWNER', 'MANAGER', 'MEMBER', 'VIEWER'), ctrl.getMembers);
-router.post('/:projectId/members', authorizeProject('OWNER', 'MANAGER'), validate(addMemberSchema), ctrl.addMember);
+router.post('/:projectId/members', authorizeProject('OWNER', 'MANAGER'), enforceMemberQuota, validate(addMemberSchema), ctrl.addMember);
 router.patch('/:projectId/members/:userId', authorizeProject('OWNER', 'MANAGER'), validate(updateMemberSchema), ctrl.updateMember);
 router.delete('/:projectId/members/:userId', authorizeProject('OWNER', 'MANAGER'), ctrl.removeMember);
 

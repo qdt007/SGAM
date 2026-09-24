@@ -16,17 +16,19 @@ export const tasksApi = {
   create: async (projectId: string, data: Partial<Task>): Promise<Task> =>
     (await api.post('/projects/' + projectId + '/tasks', data)).data.data,
   get: async (id: string): Promise<Task> => (await api.get('/tasks/' + id)).data.data,
-  update: async (id: string, data: Partial<Task>): Promise<Task> =>
-    (await api.patch('/tasks/' + id, data)).data.data,
-  delete: async (id: string): Promise<void> => { await api.delete('/tasks/' + id); },
+  update: async (id: string, data: Partial<Task>): Promise<Task> => (await api.patch('/tasks/' + id, data)).data.data,
+  delete: async (id: string): Promise<void> => {
+    await api.delete('/tasks/' + id);
+  },
   move: async (id: string, data: { columnId: string; order: number }): Promise<Task> =>
     (await api.patch('/tasks/' + id + '/move', data)).data.data,
 
-  getSubtasks: async (taskId: string): Promise<Task[]> =>
-    (await api.get('/tasks/' + taskId + '/subtasks')).data.data,
+  getSubtasks: async (taskId: string): Promise<Task[]> => (await api.get('/tasks/' + taskId + '/subtasks')).data.data,
   createSubtask: async (taskId: string, data: Partial<Task>): Promise<Task> =>
     (await api.post('/tasks/' + taskId + '/subtasks', data)).data.data,
 
+  listProjectDependencies: async (projectId: string): Promise<TaskDependency[]> =>
+    (await api.get('/projects/' + projectId + '/tasks/dependencies')).data.data,
   getDependencies: async (taskId: string): Promise<TaskDependency[]> =>
     (await api.get('/tasks/' + taskId + '/dependencies')).data.data,
   addDependency: async (taskId: string, blockingTaskId: string): Promise<TaskDependency> =>

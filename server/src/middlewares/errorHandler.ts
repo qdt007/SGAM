@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 import { ZodError } from 'zod';
+import { MulterError } from 'multer';
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2025') { res.status(404).json({ success: false, message: 'Resource not found' }); return; }
@@ -11,6 +12,16 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   if (err instanceof TokenExpiredError) { res.status(401).json({ success: false, message: 'Token expired', code: 'TOKEN_EXPIRED' }); return; }
   if (err instanceof JsonWebTokenError) { res.status(401).json({ success: false, message: 'Invalid token', code: 'INVALID_TOKEN' }); return; }
   if (err instanceof ZodError) { res.status(422).json({ success: false, message: 'Validation failed', errors: err.errors.map((e) => ({ field: e.path.join('.'), message: e.message })) }); return; }
+  if (err instanceof MulterError) {
+    const tooBig = err.code === 'LIMIT_FILE_SIZE';
+    res.status(tooBig ? 413 : 400).json({ success: false, message: tooBig ? 'File is too large' : err.message }); return;
+  }
+  if (typeof err === 'object' && err !== null && 'status' in err) {
+    const status = Number((err as { status: unknown }).status);
+    if (Number.isInteger(status) && status >= 400 && status < 600) {
+      res.status(status).json({ success: false, message: err instanceof Error ? err.message : 'Request failed' }); return;
+    }
+  }
   const message = process.env.NODE_ENV === 'production' ? 'Internal server error' : (err instanceof Error ? err.message : String(err));
   console.error('[ErrorHandler]', err);
   res.status(500).json({ success: false, message });

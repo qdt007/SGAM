@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import prisma from '../config/db';
 import { enqueueNotification } from './notificationQueue';
-import { enqueueEmail } from './emailQueue';
+import { enqueueEmailToUser } from './emailQueue';
 import { NotificationType } from '@prisma/client';
 export function startReminderJob(): void {
   cron.schedule('0 8 * * *', async () => {
@@ -15,7 +15,7 @@ export function startReminderJob(): void {
       for (const task of tasks) {
         if (!task.assignee) continue;
         await enqueueNotification({ recipientId: task.assignee.id, type: NotificationType.DEADLINE_APPROACHING, taskId: task.id, message: `Task "${task.title}" in ${task.project.name} is due tomorrow.` });
-        await enqueueEmail({ to: task.assignee.email, subject: `Deadline: "${task.title}"`, html: `<p>Your task <b>${task.title}</b> is due tomorrow.</p>` });
+        await enqueueEmailToUser(task.assignee.id, NotificationType.DEADLINE_APPROACHING, { subject: `Deadline: "${task.title}"`, html: `<p>Your task <b>${task.title}</b> is due tomorrow.</p>` });
       }
       console.log(`[ReminderJob] Sent ${tasks.length} reminders`);
     } catch (err) { console.error('[ReminderJob]', err); }

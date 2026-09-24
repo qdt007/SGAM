@@ -23,6 +23,8 @@ npm run dev
 - Backend: http://localhost:5000
 - Prisma Studio: `npm run prisma:studio`
 
+See `ROADMAP.md` for the per-endpoint status and `CLAUDE.md` for the architecture.
+
 ## Features
 - Auth (JWT + refresh token rotation)
 - Projects & Tasks CRUD
@@ -34,5 +36,5 @@ npm run dev
 - In-app Notifications
 - Time Tracking with live timer
 - Reports: Burndown, Workload, Dashboard
-- Role-based permissions (Owner/Manager/Member/Viewer)
+- Role-based permissions (Owner/Manager/Member/Viewer), enforced down to task-scoped routes
 - Dark mode

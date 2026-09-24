@@ -22,6 +22,11 @@ export const moveTaskSchema = z.object({
   order: z.number(),
 });
 
+export const addDependencySchema = z.object({
+  blockingTaskId: z.string().uuid(),
+});
+
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type MoveTaskInput = z.infer<typeof moveTaskSchema>;
+export type AddDependencyInput = z.infer<typeof addDependencySchema>;

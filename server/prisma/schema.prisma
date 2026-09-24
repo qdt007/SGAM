@@ -43,6 +43,29 @@ enum Priority {
   LOW
 }
 
+enum PlanTier {
+  FREE
+  PRO
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
 enum NotificationType {
   TASK_ASSIGNED
   TASK_UPDATED
@@ -54,26 +77,82 @@ enum NotificationType {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  username      String   @unique
-  passwordHash  String
-  displayName   String
-  avatarUrl     String?
-  globalRole    GlobalRole @default(USER)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String     @id @default(uuid())
+  email        String     @unique
+  username     String     @unique
+  passwordHash String
+  displayName  String
+  avatarUrl    String?
+  globalRole   GlobalRole @default(USER)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   projectMemberships ProjectMember[]
-  assignedTasks      Task[]          @relation("TaskAssignee")
-  createdTasks       Task[]          @relation("TaskCreator")
+  assignedTasks      Task[]                  @relation("TaskAssignee")
+  createdTasks       Task[]                  @relation("TaskCreator")
   comments           Comment[]
   notifications      Notification[]
   timeLogs           TimeLog[]
   files              File[]
   refreshTokens      RefreshToken[]
   sentMentions       Mention[]
+  notificationPrefs  NotificationPreference?
+  subscription       Subscription?
+  payments           Payment[]
+}
+
+/// One row per user. A user without a row is treated as FREE.
+model Subscription {
+  id                String             @id @default(uuid())
+  userId            String             @unique
+  tier              PlanTier           @default(FREE)
+  status            SubscriptionStatus @default(ACTIVE)
+  cycle             BillingCycle?
+  startedAt         DateTime?
+  /// When the paid period runs out. Null on FREE.
+  currentPeriodEnd  DateTime?
+  /// Keeps Pro until the period ends instead of cutting access immediately.
+  cancelAtPeriodEnd Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+}
+
+/// Invoice history. `provider` records which gateway produced it.
+model Payment {
+  id             String        @id @default(uuid())
+  subscriptionId String
+  userId         String
+  /// Minor-unit free: VND has no cents, so this is a plain dong amount.
+  amount         Int
+  currency       String        @default("VND")
+  cycle          BillingCycle
+  status         PaymentStatus @default(PENDING)
+  provider       String        @default("MOCK")
+  providerRef    String        @unique
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreference {
+  id                  String  @id @default(uuid())
+  userId              String  @unique
+  taskAssigned        Boolean @default(true)
+  taskUpdated         Boolean @default(true)
+  taskCommented       Boolean @default(true)
+  mentioned           Boolean @default(true)
+  deadlineApproaching Boolean @default(true)
+  projectInvite       Boolean @default(true)
+  fileUploaded        Boolean @default(false)
+  emailEnabled        Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model RefreshToken {
