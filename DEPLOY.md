@@ -137,7 +137,9 @@ If you see that, the backend is live.
    | `VITE_SOCKET_URL` | `https://pm-api-xxxx.onrender.com` — no `/api` |
 
 8. Click **Deploy**. Two to three minutes.
-9. You get a URL like `https://sgam.vercel.app`. Open it — the login page should appear.
+9. Vercel shows your deployment URL at the top of the project page. **Copy the real one** — the
+   name `sgam` may already be taken by someone else, so yours is likely something like
+   `sgam-qdt007.vercel.app` or `sgam-a1b2c3.vercel.app`. Open it; the login page should appear.
 
 Logging in will still fail at this point. That is expected; step 5 fixes it.
 
@@ -149,14 +151,15 @@ The backend currently refuses requests from your Vercel address, because you set
 localhost in step 3. That is a security feature (CORS), not a bug.
 
 1. In **Render** → your `pm-api` service → **Environment** in the left sidebar.
-2. Edit `CLIENT_URL` and set it to your exact Vercel URL:
+2. Edit `CLIENT_URL` and set it to **your own** Vercel URL, copied from the Vercel dashboard:
 
    ```
-   https://sgam.vercel.app
+   https://YOUR-PROJECT.vercel.app
    ```
 
-   No trailing slash. It must match exactly — `http` instead of `https`, or a `/` on the end, and
-   it will not work.
+   Do not guess it and do not copy the example above. `sgam.vercel.app` belongs to someone else;
+   pointing at it means your real site gets blocked by CORS and login fails with no useful error.
+   No trailing slash, and `https` not `http` — it must match character for character.
 3. **Save Changes**. Render redeploys automatically, about 2 minutes.
 4. Reload your Vercel URL and sign in:
 
