@@ -236,6 +236,17 @@ build command in the Render dashboard, put the flag back.
 **Render keeps building the old commit.** Blueprint changes need a sync. Open the **Blueprint**
 page (left sidebar → your blueprint) and click **Manual sync** at the top right.
 
+**The build succeeds but the deploy fails with `P1012 ... the URL must start with the protocol
+postgresql://`.** `DATABASE_URL` in Render is missing or malformed. Render stores the value
+exactly as typed, so the three usual causes are:
+
+- the variable was never filled in
+- it was copied **with the surrounding quotes** — `"postgresql://..."` starts with `"`
+- it was copied from Neon's `psql 'postgresql://...'` command, including the `psql ` prefix
+
+The value must begin with `postgresql://` and end with `?sslmode=require`, with no quotes and no
+trailing space. Copy it from `server/.env.remote.local`, taking everything after the `=`.
+
 **A task attachment gives 404.** Step 6 has not been run with the Cloudinary keys yet.
 
 ---
