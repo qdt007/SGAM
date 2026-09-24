@@ -107,8 +107,8 @@ Render runs the Node server: the API, the realtime socket, the reminder job.
 
    The migrations are already applied, so it will say there is nothing to do. That is correct.
 
-9. At the top of the page Render shows your URL, like `https://pm-api-xxxx.onrender.com`.
-   **Copy it.** Open `<that URL>/health` in a browser — you should see:
+9. At the top of the page Render shows your URL — it carries a random suffix, so copy the real
+   one rather than typing anything from this guide. **Copy it.** Open `<that URL>/health` in a browser — you should see:
 
    ```json
    {"status":"ok","timestamp":"..."}
@@ -133,8 +133,12 @@ If you see that, the backend is live.
 
    | Name | Value |
    |---|---|
-   | `VITE_API_URL` | `https://pm-api-xxxx.onrender.com/api` — note the `/api` on the end |
-   | `VITE_SOCKET_URL` | `https://pm-api-xxxx.onrender.com` — no `/api` |
+   | `VITE_API_URL` | your Render URL **+ `/api`** |
+   | `VITE_SOCKET_URL` | your Render URL, **no** `/api` |
+
+   Use the URL Render gave you in step 3, copied from its dashboard. It contains a random
+   suffix, so it is never literally `pm-api-xxxx` — that placeholder resolves to nothing and the
+   app fails to log in with no visible error. Paste your own, twice, differing only by `/api`.
 
 8. Click **Deploy**. Two to three minutes.
 9. Vercel shows your deployment URL at the top of the project page. **Copy the real one** — the
