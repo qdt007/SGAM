@@ -15,10 +15,23 @@ GitHub ──┬──> Render  (server/)  ──> Neon        (database)
 
 ---
 
-## Status
+## Status — live since 2026-09-24
 
-| Step | State |
+| Piece | Where |
 |---|---|
+| Frontend | https://sgam-xi.vercel.app |
+| API | https://pm-api-zdtj.onrender.com (`/health` for a pulse) |
+| Database | Neon, 3 migrations applied, demo data loaded |
+| Uploads | Cloudinary, folder `pm-uploads/` |
+
+Verified end to end: CORS, login, register, an authenticated request, and the Socket.io
+handshake. Demo login is `demo@test.com` / `Demo1234!`.
+
+The steps below are kept as the record of how it was set up, and for rebuilding it from scratch.
+
+**Outstanding:** rotate the Neon password (see the security note at the bottom).
+
+---|---|
 | Neon database | **Done** — 3 migrations applied, demo data loaded (7 users, 3 projects, 32 tasks) |
 | Push to GitHub | **Done** — commit `c2b01df` on `main` |
 | Cloudinary | Step 1 below |
