@@ -20,8 +20,8 @@ GitHub ──┬──> Render  (server/)  ──> Neon        (database)
 | Step | State |
 |---|---|
 | Neon database | **Done** — 3 migrations applied, demo data loaded (7 users, 3 projects, 32 tasks) |
+| Push to GitHub | **Done** — commit `c2b01df` on `main` |
 | Cloudinary | Step 1 below |
-| Push to GitHub | Step 2 below |
 | Render (backend) | Step 3 below |
 | Vercel (frontend) | Step 4 below |
 | Connect the two | Step 5 below |
@@ -55,21 +55,20 @@ Cloudinary stores them instead. Free, no card.
 
 ---
 
-## Step 2 — Push the code to GitHub
+## Step 2 — Push the code to GitHub — already done
 
-Render and Vercel can only build what is on GitHub. Your repo already exists at
-`github.com/qdt007/SGAM`, but the current work is not committed yet.
+Render and Vercel can only build what is on GitHub. This is done: commit `c2b01df` is on `main`
+at `github.com/qdt007/SGAM`, with `render.yaml` and `client/vercel.json` in place and no `.env`
+file anywhere in the repo.
 
-Ask Claude to commit and push, or do it yourself:
+Nothing to do here. For future changes, pushing to `main` is enough — Render and Vercel both
+rebuild automatically when they see a new commit.
 
 ```powershell
 git add -A
-git commit -m "feat: deploy config, Cloudinary storage, Phase 3"
+git commit -m "your message"
 git push
 ```
-
-Refresh the GitHub page afterwards — you should see `render.yaml` in the file list. If it is not
-there, Render cannot configure itself in the next step.
 
 ---
 
