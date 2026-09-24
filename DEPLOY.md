@@ -227,6 +227,15 @@ blocked while ordinary requests still work. Fix `CLIENT_URL`.
 **Render build fails on `prisma generate`.** Almost always `DATABASE_URL` — check it is the
 **pooled** string and ends with `?sslmode=require`.
 
+**Render build fails with `TS7016: Could not find a declaration file for module 'express'`** (or
+`TS2694: Namespace 'global.Express' has no exported member 'Multer'`). npm skips devDependencies
+whenever `NODE_ENV=production`, which takes TypeScript and all the `@types` packages with it. The
+build command in `render.yaml` uses `npm ci --include=dev` to override that. If you edited the
+build command in the Render dashboard, put the flag back.
+
+**Render keeps building the old commit.** Blueprint changes need a sync. Open the **Blueprint**
+page (left sidebar → your blueprint) and click **Manual sync** at the top right.
+
 **A task attachment gives 404.** Step 6 has not been run with the Cloudinary keys yet.
 
 ---
