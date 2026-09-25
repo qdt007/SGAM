@@ -29,6 +29,11 @@ export const projectsApi = {
     await api.delete('/projects/' + projectId + '/columns/' + columnId);
   },
 
+  addTag: async (projectId: string, data: { name: string; color?: string }): Promise<Tag> =>
+    (await api.post('/projects/' + projectId + '/tags', data)).data.data,
+  removeTag: async (projectId: string, tagId: string): Promise<void> => {
+    await api.delete('/projects/' + projectId + '/tags/' + tagId);
+  },
   getTags: async (projectId: string): Promise<Tag[]> =>
     (await api.get('/projects/' + projectId + '/tags')).data.data,
 };

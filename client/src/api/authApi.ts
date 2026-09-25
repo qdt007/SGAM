@@ -21,6 +21,7 @@ export const authApi = {
   refresh: async (refreshToken: string) =>
     (await api.post('/auth/refresh', { refreshToken })).data.data,
 
+  logoutAll: async (): Promise<{ revoked: number }> => (await api.post('/auth/logout-all')).data.data,
   logout: async (refreshToken?: string): Promise<void> => {
     await api.post('/auth/logout', { refreshToken });
   },

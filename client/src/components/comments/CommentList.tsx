@@ -9,6 +9,7 @@ import { keys } from '../../constants/queryKeys';
 import { Comment } from '../../types';
 import { cn } from '../../utils/cn';
 import { CommentEditor } from './CommentEditor';
+import { Avatar } from '../ui/Avatar';
 
 /** Renders @handles as highlighted chips without dangerouslySetInnerHTML. */
 function CommentBody({ body }: { body: string }) {
@@ -91,9 +92,7 @@ export function CommentList({ taskId, canComment = true }: { taskId: string; can
             const isMine = c.authorId === user?.id;
             return (
               <div key={c.id} className="group flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                  {c.author?.displayName?.[0]?.toUpperCase() ?? '?'}
-                </div>
+                <Avatar name={c.author?.displayName} src={c.author?.avatarUrl} size="md" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-ink">{c.author?.displayName}</span>

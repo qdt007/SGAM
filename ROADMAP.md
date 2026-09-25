@@ -127,8 +127,26 @@ Reports trước đây đếm cả subtask (22) trong khi danh sách task chỉ 
 
 ---
 
+## Phase 5 — Hoàn thiện các chức năng dang dở (2026-09-25)
+
+Rà soát bằng cách đối chiếu endpoint backend với nơi gọi ở client; hàm API không ai gọi = UI còn thiếu.
+
+- ✅ **Avatar** — `POST/DELETE /api/users/me/avatar` (multer riêng: chỉ PNG/JPEG/WebP/GIF, 2MB, loại SVG vì chứa script được). Cột mới `User.avatarKey` để xoá blob cũ khi thay. UI upload/xoá trong Settings, và component `ui/Avatar` thay cho chữ cái đầu ở 7 chỗ (top bar, comment, member, assignee, workload, @mention picker).
+- ✅ **Tags** — trước chỉ có `GET`. Thêm `POST /projects/:id/tags`, `DELETE /projects/:id/tags/:tagId`, `PUT /tasks/:id/tags`. UI: panel Tags ở sidebar project, bộ chọn tag trong task panel, chip tag trên task row.
+- ✅ **Log giờ thủ công** — `POST /api/tasks/:id/time` đã có từ trước nhưng không có UI. Thêm form ngày + số giờ + ghi chú trong `TaskTimer`.
+- ✅ **Xoá tất cả thông báo** — backend đã có `DELETE /notifications/clear-all`, client thiếu cả hàm lẫn nút. Đã nối.
+- ✅ **Sửa/xoá project ở trang chi tiết** — trước chỉ làm được từ trang danh sách. Tách `ProjectModal` ra `components/projects/` (đúng quy ước trong CLAUDE.md) rồi dùng lại ở cả hai nơi. Menu theo quyền: MANAGER sửa, chỉ OWNER xoá.
+- ✅ **Bỏ 2FA giả** — dòng "coming soon" thay bằng **Sign out everywhere** có thật (`POST /api/auth/logout-all`, xoá sạch refresh token).
+- ✅ **Sửa type sai** — `Task.tags` khai là `Tag[]` trong khi API trả `TaskTag[]`. Chưa lộ ra vì chưa chỗ nào render tag.
+
+### Cố ý không làm
+- **Cột Kanban tuỳ biến** — bảng `KanbanColumn` + 4 endpoint + 4 hàm API đều có nhưng board dùng mảng `COLUMNS` cứng trong `kanbanColumns.ts`. Chuyển board sang đọc cột từ DB là refactor lớn (KanbanPage, TaskCard, logic move `status` → `columnId`, CreateTaskModal) trên một app đang chạy thật. Board 5 cột cố định vẫn dùng tốt, nên để lại.
+
+---
+
 ## Nợ kỹ thuật còn lại
 
 - [ ] Test mới phủ logic thuần và contract API; chưa có integration test chạm DB thật (cần DB riêng cho test)
 - [ ] Chưa có E2E (Playwright) cho luồng kéo thả Kanban và Gantt
+- [ ] Cột Kanban tuỳ biến chưa nối UI (xem "Cố ý không làm" ở trên)
 - [ ] PostgreSQL cài tay, không có Windows service; phải khởi động qua scheduled task trong `start-all.bat`

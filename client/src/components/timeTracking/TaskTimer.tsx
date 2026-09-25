@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { timeApi } from '../../api/timeApi';
@@ -30,6 +31,46 @@ export function TaskTimer({
     mutationFn: (id: string) => timeApi.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.tasks.timeLogs(taskId) }),
   });
+
+  const [showManual, setShowManual] = useState(false);
+  const [manualDate, setManualDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [manualHours, setManualHours] = useState('1');
+  const [manualNote, setManualNote] = useState('');
+  const [manualError, setManualError] = useState('');
+
+  const { mutate: logManual, isPending: loggingManual } = useMutation({
+    mutationFn: () => {
+      // The API wants a real interval, so anchor the entry at 09:00 on the chosen day and let
+      // the duration decide when it ended. Minute-level accuracy is not what manual entry is for.
+      const started = new Date(`${manualDate}T09:00:00`);
+      const ended = new Date(started.getTime() + Number(manualHours) * 60 * 60 * 1000);
+      return timeApi.logManual(taskId, {
+        startedAt: started.toISOString(),
+        endedAt: ended.toISOString(),
+        note: manualNote.trim() || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.tasks.timeLogs(taskId) });
+      setShowManual(false);
+      setManualHours('1');
+      setManualNote('');
+      setManualError('');
+    },
+    onError: (e) =>
+      setManualError(
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+          'Could not save that time log',
+      ),
+  });
+
+  const submitManual = () => {
+    const hours = Number(manualHours);
+    if (!manualDate) return setManualError('Pick a date.');
+    if (!Number.isFinite(hours) || hours <= 0) return setManualError('Hours must be greater than 0.');
+    if (hours > 24) return setManualError('One entry cannot be longer than 24 hours.');
+    logManual();
+  };
 
   const totalMin = logs.reduce((s, l) => s + (l.durationMin ?? 0), 0);
 
@@ -69,6 +110,65 @@ export function TaskTimer({
             {isActive ? formattedElapsed : '00:00:00'}
           </span>
           {isActive && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse ml-auto" />}
+        </div>
+      )}
+
+      {canTrack && (
+        <div>
+          {!showManual ? (
+            <button
+              onClick={() => setShowManual(true)}
+              className="text-xs text-primary hover:underline"
+            >
+              + Log time manually
+            </button>
+          ) : (
+            <div className="space-y-2 rounded-xl bg-black/[0.03] p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-2xs text-ink-muted">Date</span>
+                  <input
+                    type="date"
+                    value={manualDate}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setManualDate(e.target.value)}
+                    className="input py-1 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-2xs text-ink-muted">Hours</span>
+                  <input
+                    type="number"
+                    step="0.25"
+                    min="0.25"
+                    max="24"
+                    value={manualHours}
+                    onChange={(e) => setManualHours(e.target.value)}
+                    className="input w-24 py-1 text-sm"
+                  />
+                </label>
+              </div>
+              <input
+                value={manualNote}
+                onChange={(e) => setManualNote(e.target.value)}
+                placeholder="What did you work on? (optional)"
+                maxLength={500}
+                className="input w-full py-1 text-sm"
+              />
+              {manualError && <p className="text-xs text-red-500">{manualError}</p>}
+              <div className="flex items-center gap-2">
+                <button onClick={submitManual} disabled={loggingManual} className="btn-primary text-sm py-1 px-3">
+                  {loggingManual ? 'Saving...' : 'Add entry'}
+                </button>
+                <button
+                  onClick={() => { setShowManual(false); setManualError(''); }}
+                  className="btn-ghost text-sm py-1 px-3"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -62,3 +62,29 @@ describe('validation', () => {
     expect(res.status).toBe(422);
   });
 });
+
+/** Routes added when the half-finished features were completed. */
+describe('avatar, tags and session endpoints', () => {
+  const NIL = '00000000-0000-0000-0000-000000000000';
+  const newRoutes: [string, string][] = [
+    ['post', '/api/users/me/avatar'],
+    ['delete', '/api/users/me/avatar'],
+    ['post', '/api/auth/logout-all'],
+    ['post', `/api/projects/${NIL}/tags`],
+    ['delete', `/api/projects/${NIL}/tags/${NIL}`],
+    ['put', `/api/tasks/${NIL}/tags`],
+    ['delete', '/api/notifications/clear-all'],
+  ];
+
+  it.each(newRoutes)('%s %s requires a token', async (method, path) => {
+    const res = await (request(app) as never as Record<string, (p: string) => request.Test>)[method](path);
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('NO_TOKEN');
+  });
+
+  // Ordering regression: /clear-all must stay above /:id or it is parsed as a notification id.
+  it('routes DELETE /notifications/clear-all before the :id route', async () => {
+    const res = await request(app).delete('/api/notifications/clear-all');
+    expect(res.status).toBe(401);
+  });
+});

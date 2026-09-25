@@ -8,7 +8,7 @@ import { keys } from '../constants/queryKeys';
 
 export function useNotifications() {
   const queryClient = useQueryClient();
-  const { setNotifications, addNotification, markRead, markAllRead, unreadCount, notifications } =
+  const { setNotifications, addNotification, markRead, markAllRead, clearAll, unreadCount, notifications } =
     useNotificationStore();
   const { on, off } = useSocket();
 
@@ -41,5 +41,13 @@ export function useNotifications() {
     onSuccess: () => markAllRead(),
   });
 
-  return { notifications, unreadCount, isLoading, markAsRead, markAllAsRead };
+  const { mutate: clearAllNotifications } = useMutation({
+    mutationFn: notificationsApi.clearAll,
+    onSuccess: () => {
+      clearAll();
+      queryClient.invalidateQueries({ queryKey: keys.notifications.all });
+    },
+  });
+
+  return { notifications, unreadCount, isLoading, markAsRead, markAllAsRead, clearAllNotifications };
 }

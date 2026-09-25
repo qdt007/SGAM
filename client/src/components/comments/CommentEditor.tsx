@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { useMentions } from '../../hooks/useMentions';
 import { cn } from '../../utils/cn';
+import { Avatar } from '../ui/Avatar';
 
 interface CommentEditorProps {
   onSubmit: (body: string) => void;
@@ -110,9 +111,7 @@ export function CommentEditor({
                 i === highlighted ? 'bg-primary/10' : 'hover:bg-black/[0.03]',
               )}
             >
-              <div className="h-7 w-7 rounded-full bg-primary text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                {u.displayName?.[0]?.toUpperCase()}
-              </div>
+              <Avatar name={u.displayName} src={u.avatarUrl} size="sm" />
               <div className="min-w-0">
                 <p className="text-sm text-ink truncate">{u.displayName}</p>
                 <p className="text-xs text-ink-muted truncate">@{u.username}</p>

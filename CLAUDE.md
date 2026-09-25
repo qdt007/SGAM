@@ -67,7 +67,18 @@ Things worth knowing before you change them:
 - **A user may only have one timer running at a time.** `timeTracking.service.startTimer` closes the previous one and emits `TIMER_CONFLICT` rather than letting two run.
 - **@handles only become mentions for members of that project**, checked in `comments.service.create`.
 - **Reports count top-level tasks only** (`parentId: null`), so the numbers match what the list, board and gantt show. Subtasks are checklist items inside a task, not scope of their own — time logged on them still counts.
-- **File bytes go through `config/storage.ts`, never straight to disk.** `STORAGE_TYPE` picks the backend: `local` (dev, writes to `UPLOADS_DIR`) or `cloudinary` (production). Multer buffers in memory and the backend decides where the bytes land, so `files.service` only ever sees `{ filename, storageKey, url }`. Cloudinary needs the same `resource_type` to delete that it got to upload, so `resourceTypeFor()` derives it from the mime type in both directions — change one and you orphan blobs.
+- **Avatars are uploads, not URLs.** `POST/DELETE /api/users/me/avatar` store the image through
+  `config/storage.ts` and keep its key in `User.avatarKey` so the previous blob is deleted on
+  replace. `updateMe` clears `avatarKey` when `avatarUrl` is set to an external link, or the key
+  would describe a file that is no longer being served. Render it with `components/ui/Avatar`,
+  which falls back to an initial on a missing or dead image.
+- **Tags are global rows** (`Tag.name` is unique table-wide); `ProjectTag` is what scopes one to a
+  project. `projects.service.addTag` upserts by name so two projects share a tag rather than
+  colliding, and `removeTag` also clears that tag off the project's tasks. `tasks.service.setTags`
+  replaces the whole set and rejects tags outside the task's project.
+- **`GET /tasks/:id` returns tags as join rows**, `{ taskId, tagId, tag }` — the `TaskTag` type,
+  not `Tag`. Reach for `t.tag.name`, not `t.name`.
+- **File bytes go through `config/storage.ts`, never straight to disk.** `STORAGE_TYPE` picks the backend: `local` (dev, writes to `UPLOADS_DIR`) or `cloudinary` (production). Multer buffers in memory and the backend decides where the bytes land, so `files.service` only ever sees `{ filename, storageKey, url }`. Cloudinary needs the same `resource_type` to delete that it got to upload, so `resourceTypeFor()` derives it from the mime type in both directions — change one and you orphan blobs. Image uploads drop the extension from the `public_id` because Cloudinary appends the format itself; `raw` keeps it.
 - **CORS and the Socket.io handshake share `config/cors.ts`.** `CLIENT_URL` is a comma-separated list; edit `isAllowedOrigin` rather than either call site, or the two drift apart and websockets fail while REST works.
 - **Socket emits are best-effort** (`io?.to(...)`), so a write never fails because the socket layer is down.
 - **Notifications and email go through `enqueueNotification` / `enqueueEmailToUser`**, which fall back to a direct write/send when Redis is absent. Don't call `prisma.notification.create` or `sendMail` directly from a service — those two funnels are where `NotificationPreference` is enforced, so bypassing them sends mail a user has switched off.

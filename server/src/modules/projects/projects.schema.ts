@@ -31,3 +31,9 @@ export const updateColumnSchema = createColumnSchema.partial();
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
+export const addTagSchema = z.object({
+  name: z.string().min(1, 'Tag name is required').max(30),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #6366f1').optional(),
+});
+export type AddTagInput = z.infer<typeof addTagSchema>;

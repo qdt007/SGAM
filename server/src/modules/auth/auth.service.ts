@@ -35,6 +35,11 @@ export async function refreshTokens(token: string) {
   return issueTokens(user.id, user.globalRole);
 }
 export async function logout(token: string): Promise<void> { await prisma.refreshToken.deleteMany({ where: { token } }); }
+/** Drops every refresh token the user holds, so all other devices fall out at their next refresh. */
+export async function logoutEverywhere(userId: string): Promise<number> {
+  const { count } = await prisma.refreshToken.deleteMany({ where: { userId } });
+  return count;
+}
 export async function getMe(userId: string) {
   return prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { id: true, email: true, username: true, displayName: true, avatarUrl: true, globalRole: true, createdAt: true } });
 }

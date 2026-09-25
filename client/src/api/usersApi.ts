@@ -32,6 +32,12 @@ export const usersApi = {
   myStats: async (): Promise<MyStats> => (await api.get('/users/me/stats')).data.data,
   updateMe: async (data: { displayName?: string; username?: string; avatarUrl?: string | null }): Promise<User> =>
     (await api.patch('/users/me', data)).data.data,
+  uploadAvatar: async (file: File): Promise<User> => {
+    const form = new FormData();
+    form.append('avatar', file);
+    return (await api.post('/users/me/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data.data;
+  },
+  removeAvatar: async (): Promise<User> => (await api.delete('/users/me/avatar')).data.data,
   changePassword: async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
     await api.patch('/users/me/password', data);
   },

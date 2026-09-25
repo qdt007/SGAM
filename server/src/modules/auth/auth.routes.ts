@@ -9,5 +9,6 @@ router.post('/register', registerLimiter, validate(registerSchema), authControll
 router.post('/login', authLimiter, validate(loginSchema), authController.login);
 router.post('/refresh', validate(refreshSchema), authController.refresh);
 router.post('/logout', authController.logout);
+router.post('/logout-all', authenticate, authController.logoutEverywhere);
 router.get('/me', authenticate, authController.getMe);
 export default router;

@@ -1,4 +1,5 @@
 import prisma from '../../config/db';
+import { saveFile, removeFile, UploadInput } from '../../config/storage';
 import { hashPassword, comparePassword } from '../../utils/hash';
 import { UpdateMeInput, ChangePasswordInput, UpdateNotificationPrefsInput } from './users.schema';
 
@@ -36,7 +37,54 @@ export async function updateMe(userId: string, input: UpdateMeInput) {
     const taken = await prisma.user.findFirst({ where: { username: input.username, NOT: { id: userId } }, select: { id: true } });
     if (taken) throw Object.assign(new Error('This username is already taken'), { status: 409 });
   }
-  return prisma.user.update({ where: { id: userId }, data: input, select: publicSelect });
+  // Pointing avatarUrl at an external image abandons any blob we uploaded, so drop it here
+  // rather than leaving a key that no longer describes what avatarUrl serves.
+  const replacingAvatar = input.avatarUrl !== undefined;
+  const previous = replacingAvatar
+    ? await prisma.user.findUnique({ where: { id: userId }, select: { avatarKey: true } })
+    : null;
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: replacingAvatar ? { ...input, avatarKey: null } : input,
+    select: publicSelect,
+  });
+  if (previous?.avatarKey) await removeFile(previous.avatarKey, AVATAR_DELETE_MIME);
+  return user;
+}
+
+// Every mime uploadAvatar accepts (png/jpeg/webp/gif) maps to the same Cloudinary resource_type,
+// so one representative is enough to delete any of them, and the local backend ignores it.
+const AVATAR_DELETE_MIME = 'image/png';
+
+/** Replaces the avatar with an uploaded image and cleans up the blob it replaced. */
+export async function setAvatar(userId: string, file: UploadInput) {
+  const current = await prisma.user.findUnique({ where: { id: userId }, select: { avatarKey: true } });
+  if (!current) throw Object.assign(new Error('User not found'), { status: 404 });
+
+  const stored = await saveFile(file);
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { avatarUrl: stored.url, avatarKey: stored.storageKey },
+    select: publicSelect,
+  });
+  // Only once the new avatar is committed: a failed cleanup must never cost the user the new one.
+  if (current.avatarKey) await removeFile(current.avatarKey, AVATAR_DELETE_MIME);
+  return user;
+}
+
+/** Clears the avatar and deletes the stored image, falling the UI back to initials. */
+export async function removeAvatar(userId: string) {
+  const current = await prisma.user.findUnique({ where: { id: userId }, select: { avatarKey: true } });
+  if (!current) throw Object.assign(new Error('User not found'), { status: 404 });
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { avatarUrl: null, avatarKey: null },
+    select: publicSelect,
+  });
+  if (current.avatarKey) await removeFile(current.avatarKey, AVATAR_DELETE_MIME);
+  return user;
 }
 
 export async function changePassword(userId: string, input: ChangePasswordInput) {

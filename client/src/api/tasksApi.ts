@@ -23,6 +23,8 @@ export const tasksApi = {
   move: async (id: string, data: { columnId: string; order: number }): Promise<Task> =>
     (await api.patch('/tasks/' + id + '/move', data)).data.data,
 
+  setTags: async (taskId: string, tagIds: string[]): Promise<Task> =>
+    (await api.put('/tasks/' + taskId + '/tags', { tagIds })).data.data,
   getSubtasks: async (taskId: string): Promise<Task[]> => (await api.get('/tasks/' + taskId + '/subtasks')).data.data,
   createSubtask: async (taskId: string, data: Partial<Task>): Promise<Task> =>
     (await api.post('/tasks/' + taskId + '/subtasks', data)).data.data,

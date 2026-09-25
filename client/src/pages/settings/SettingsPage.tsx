@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { User, Moon, Sun, Bell, Shield, Palette, ChevronRight } from 'lucide-react';
 import { usersApi, NotificationPrefs } from '../../api/usersApi';
+import { authApi } from '../../api/authApi';
 import { Page, PageHeader } from '../../components/ui/Page';
 import { Tabs } from '../../components/ui/Tabs';
+import { Avatar } from '../../components/ui/Avatar';
 import { BillingSection } from '../../components/billing/BillingSection';
 import { keys } from '../../constants/queryKeys';
 import { useAuthStore } from '../../stores/authStore';
@@ -36,6 +38,71 @@ const MENU: { id: Section; label: string; icon: React.ElementType; desc: string 
   { id: 'security', label: 'Security', icon: Shield, desc: 'Password and access' },
 ];
 
+const AVATAR_MAX_MB = 2;
+const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+function AvatarField() {
+  const { user, updateUser } = useAuthStore();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState('');
+
+  const upload = useMutation({
+    mutationFn: (file: File) => usersApi.uploadAvatar(file),
+    onSuccess: (updated) => { updateUser(updated); setError(''); },
+    onError: (e) => setError(apiMessage(e, 'Could not upload that image')),
+  });
+
+  const remove = useMutation({
+    mutationFn: () => usersApi.removeAvatar(),
+    onSuccess: (updated) => { updateUser(updated); setError(''); },
+    onError: (e) => setError(apiMessage(e, 'Could not remove your photo')),
+  });
+
+  const pick = (file: File | undefined) => {
+    if (!file) return;
+    // Checked here too so the common mistakes fail instantly instead of after an upload.
+    if (!AVATAR_TYPES.includes(file.type)) return setError('Use a PNG, JPEG, WebP or GIF image.');
+    if (file.size > AVATAR_MAX_MB * 1024 * 1024) return setError(`Keep the image under ${AVATAR_MAX_MB}MB.`);
+    upload.mutate(file);
+  };
+
+  const busy = upload.isPending || remove.isPending;
+
+  return (
+    <div className="flex items-center gap-4">
+      <Avatar name={user?.displayName} src={user?.avatarUrl} size="xl" />
+      <div className="space-y-1.5">
+        <div>
+          <p className="font-semibold">{user?.displayName}</p>
+          <p className="text-sm text-ink-muted">{user?.email}</p>
+          <span className="mt-1 inline-block rounded bg-primary-100 px-2 py-0.5 text-xs text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+            {user?.globalRole}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 pt-1">
+          <button onClick={() => inputRef.current?.click()} disabled={busy} className="btn-secondary text-sm py-1.5">
+            {upload.isPending ? 'Uploading...' : user?.avatarUrl ? 'Change photo' : 'Upload photo'}
+          </button>
+          {user?.avatarUrl && (
+            <button onClick={() => remove.mutate()} disabled={busy} className="btn-ghost text-sm py-1.5 text-ink-muted">
+              {remove.isPending ? 'Removing...' : 'Remove'}
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-ink-subtle">PNG, JPEG, WebP or GIF, up to {AVATAR_MAX_MB}MB.</p>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={AVATAR_TYPES.join(',')}
+        className="hidden"
+        onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }}
+      />
+    </div>
+  );
+}
+
 function ProfileSection() {
   const { user, updateUser } = useAuthStore();
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
@@ -66,18 +133,7 @@ function ProfileSection() {
         <p className="mt-1 text-small text-ink-muted">Manage your account information.</p>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center text-white text-2xl font-bold shrink-0">
-          {user?.displayName?.[0]?.toUpperCase()}
-        </div>
-        <div>
-          <p className="font-semibold">{user?.displayName}</p>
-          <p className="text-sm text-ink-muted">{user?.email}</p>
-          <span className="text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 px-2 py-0.5 rounded mt-1 inline-block">
-            {user?.globalRole}
-          </span>
-        </div>
-      </div>
+      <AvatarField />
 
       <div className="space-y-4 mt-6 border-t border-line-soft pt-6">
         <div>
@@ -263,6 +319,9 @@ function NotificationsSection() {
 }
 
 function SecuritySection() {
+  const navigate = useNavigate();
+  const { clearAuth } = useAuthStore();
+  const [confirmLogoutAll, setConfirmLogoutAll] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [current, setCurrent] = useState('');
   const [newPass, setNewPass] = useState('');
@@ -282,6 +341,16 @@ function SecuritySection() {
       }, 1500);
     },
     onError: (e) => setMsg(apiMessage(e, 'Could not change your password.')),
+  });
+
+  // The current session's refresh token dies with the rest, so drop local auth and send them
+  // to sign-in rather than leaving a shell that 401s on its next request.
+  const { mutate: logoutEverywhere, isPending: loggingOutAll } = useMutation({
+    mutationFn: () => authApi.logoutAll(),
+    onSettled: () => {
+      clearAuth();
+      navigate('/login', { replace: true });
+    },
   });
 
   const handleChange = (e: React.FormEvent) => {
@@ -366,13 +435,39 @@ function SecuritySection() {
           </form>
         )}
 
-        <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-sunken">
+        <div className="flex items-center justify-between gap-4 rounded-lg bg-sunken px-4 py-3">
           <div>
-            <p className="text-sm font-medium">Two-Factor Authentication</p>
-            <p className="text-xs text-ink-muted">Add an extra layer of security (coming soon)</p>
+            <p className="text-sm font-medium">Sign out everywhere</p>
+            <p className="text-xs text-ink-muted">
+              Revokes every signed-in device, including this one. Use it if you signed in somewhere
+              you no longer trust.
+            </p>
           </div>
-          <span className="text-xs bg-ink/[0.1] text-ink-muted px-2 py-1 rounded">Soon</span>
+          <button onClick={() => setConfirmLogoutAll(true)} className="btn-secondary shrink-0 py-1.5 text-sm">
+            Sign out all
+          </button>
         </div>
+
+        {confirmLogoutAll && (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/[0.04] px-4 py-3">
+            <p className="text-sm font-medium">Sign out of every device?</p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              You will be returned to the sign-in page and will need your password again.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={() => logoutEverywhere()}
+                disabled={loggingOutAll}
+                className="btn-primary py-1.5 text-sm"
+              >
+                {loggingOutAll ? 'Signing out...' : 'Yes, sign out everywhere'}
+              </button>
+              <button onClick={() => setConfirmLogoutAll(false)} className="btn-ghost py-1.5 text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -50,12 +50,16 @@ async function saveLocal(file: UploadInput): Promise<StoredFile> {
 
 async function saveCloudinary(file: UploadInput): Promise<StoredFile> {
   const filename = randomKey(file.originalname);
+  const resourceType = resourceTypeFor(file.mimetype);
+  // Cloudinary appends the format to an image delivery URL, so an extension left on the public_id
+  // comes out twice (`name.png.png`). `raw` serves the public_id verbatim and needs it kept.
+  const publicId = resourceType === 'image' ? filename.replace(/\.[^.]+$/, '') : filename;
   const res = await new Promise<UploadApiResponse>((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: CLOUDINARY_FOLDER,
-        public_id: filename,
-        resource_type: resourceTypeFor(file.mimetype),
+        public_id: publicId,
+        resource_type: resourceType,
         use_filename: false,
         unique_filename: false,
       },

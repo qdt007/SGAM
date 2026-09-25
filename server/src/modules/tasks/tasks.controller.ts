@@ -54,3 +54,7 @@ export const removeDependency = asyncHandler(async (req: Request, res: Response)
   await svc.removeDependency(req.params.id, req.params.depId);
   success(res, { message: 'Dependency removed' });
 });
+
+export const setTags = asyncHandler(async (req: Request, res: Response) => {
+  success(res, await svc.setTags(req.params.id, req.body.tagIds));
+});

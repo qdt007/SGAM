@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react';
 import { useUIStore } from '../../stores/uiStore';
 import { WorkloadReport } from '../../types';
+import { Avatar } from '../ui/Avatar';
 
 const SERIES = {
   light: { open: '#C2410C', done: '#16A34A' },
@@ -37,9 +38,7 @@ export function WorkloadTable({ report }: { report: WorkloadReport }) {
           {report.rows.map((r) => (
             <div key={r.user.id} className="space-y-1">
               <div className="flex items-center gap-2 text-sm">
-                <div className="h-6 w-6 rounded-full bg-primary text-white text-[10px] font-semibold flex items-center justify-center shrink-0">
-                  {r.user.displayName?.[0]?.toUpperCase()}
-                </div>
+                <Avatar name={r.user.displayName} src={r.user.avatarUrl} size="xs" />
                 <span className="text-ink truncate">{r.user.displayName}</span>
                 <span className="text-xs text-ink-muted">{r.role}</span>
                 {r.overdue > 0 && (

@@ -27,3 +27,20 @@ function fileFilter(_req: Request, file: Express.Multer.File, cb: multer.FileFil
 }
 
 export const upload = multer({ storage, fileFilter, limits: { fileSize: MAX_FILE_BYTES, files: 5 } });
+
+// Avatars are stricter than task attachments: raster images only and a much smaller ceiling.
+// SVG is deliberately excluded — it can carry script, and an avatar is rendered on every screen.
+const AVATAR_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+export const MAX_AVATAR_BYTES = parseInt(process.env.MAX_AVATAR_MB || '2', 10) * 1024 * 1024;
+
+export const uploadAvatar = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    if (!AVATAR_MIME.has(file.mimetype)) {
+      cb(Object.assign(new Error('Avatar must be a PNG, JPEG, WebP or GIF image'), { status: 415 }));
+      return;
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: MAX_AVATAR_BYTES, files: 1 },
+});

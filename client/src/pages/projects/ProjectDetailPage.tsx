@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { SelectField, STATUS_OPTIONS } from '../../components/ui/SelectField';
 import { Page, PageHeader, Section } from '../../components/ui/Page';
@@ -12,6 +12,10 @@ import { TaskDetailPanel } from '../../components/tasks/TaskDetailPanel';
 import { TaskRow } from '../../components/tasks/TaskRow';
 import { CreateTaskModal } from '../../components/tasks/CreateTaskModal';
 import { ProjectMembers } from '../../components/projects/ProjectMembers';
+import { ProjectModal } from '../../components/projects/ProjectModal';
+import { ProjectTags } from '../../components/projects/ProjectTags';
+import { ConfirmDialog } from '../../components/ui/Modal';
+import { useAuthStore } from '../../stores/authStore';
 import { PROJECT_STATUS_BADGE } from '../../constants/taskStyles';
 import { cn } from '../../utils/cn';
 
@@ -27,6 +31,30 @@ export function ProjectDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const currentUserId = useAuthStore((s) => s.user?.id);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [menuOpen]);
+
+  const removeProject = useMutation({
+    mutationFn: () => projectsApi.delete(projectId!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      navigate('/projects', { replace: true });
+    },
+  });
 
   // Notifications link straight to a task via ?task=<id>, so the panel reads its state from the URL.
   const openTaskId = searchParams.get('task');
@@ -71,6 +99,10 @@ export function ProjectDetailPage() {
       </Page>
     );
   }
+
+  const myRole = project.members?.find((m) => m.userId === currentUserId)?.role;
+  const canEdit = myRole === 'OWNER' || myRole === 'MANAGER';
+  const canDelete = myRole === 'OWNER';
 
   const doneTasks = tasks.filter((t) => t.status === 'DONE').length;
   const progress = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
@@ -128,6 +160,40 @@ export function ProjectDetailPage() {
               <Icon icon="ph:plus" width={15} aria-hidden />
               Add task
             </button>
+            {(canEdit || canDelete) && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setMenuOpen((o) => !o)}
+                  aria-label="Project actions"
+                  aria-haspopup="menu"
+                  className="btn-ghost btn-icon-sm"
+                >
+                  <Icon icon="ph:dots-three-bold" width={16} aria-hidden />
+                </button>
+                {menuOpen && (
+                  <div role="menu" className="menu absolute right-0 top-9 z-20 w-40">
+                    {canEdit && (
+                      <button
+                        role="menuitem"
+                        onClick={() => { setMenuOpen(false); setShowEdit(true); }}
+                        className="menu-item"
+                      >
+                        <Icon icon="ph:pencil-simple" width={15} aria-hidden /> Edit project
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        role="menuitem"
+                        onClick={() => { setMenuOpen(false); setShowDelete(true); }}
+                        className="menu-item text-red-600 dark:text-red-400"
+                      >
+                        <Icon icon="ph:trash" width={15} aria-hidden /> Delete project
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         }
       />
@@ -178,10 +244,22 @@ export function ProjectDetailPage() {
 
         <div className={cn('space-y-6')}>
           <ProjectMembers projectId={projectId!} />
+          <ProjectTags projectId={projectId!} />
         </div>
       </div>
 
       {showCreate && <CreateTaskModal projectId={projectId!} onClose={() => setShowCreate(false)} />}
+      {showEdit && <ProjectModal project={project} onClose={() => setShowEdit(false)} />}
+      {showDelete && (
+        <ConfirmDialog
+          title={`Delete "${project.name}"?`}
+          message="Every task, comment, time log and attachment in this project is deleted with it. This cannot be undone."
+          confirmLabel="Delete project"
+          loading={removeProject.isPending}
+          onConfirm={() => removeProject.mutate()}
+          onClose={() => setShowDelete(false)}
+        />
+      )}
       {openTaskId && <TaskDetailPanel taskId={openTaskId} projectId={projectId!} onClose={closeTask} />}
     </Page>
   );

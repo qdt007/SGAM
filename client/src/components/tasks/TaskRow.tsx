@@ -7,6 +7,7 @@ import { cn } from '../../utils/cn';
 import { dueDateLabel, isOverdue } from '../../utils/dateUtils';
 import { STATUS_LABEL, STATUS_BADGE, PRIORITY_DOT, PRIORITY_LABEL } from '../../constants/taskStyles';
 import { EditTaskModal } from './EditTaskModal';
+import { Avatar } from '../ui/Avatar';
 
 export function TaskRow({
   task,
@@ -82,6 +83,16 @@ export function TaskRow({
                 {task._count.subtasks}
               </span>
             )}
+            {task.tags?.slice(0, 3).map((t) => (
+              <span
+                key={t.tagId}
+                className="rounded-full px-1.5 py-0.5 text-2xs font-medium"
+                style={{ backgroundColor: `${t.tag.color}1a`, color: t.tag.color }}
+              >
+                {t.tag.name}
+              </span>
+            ))}
+            {(task.tags?.length ?? 0) > 3 && <span>+{(task.tags?.length ?? 0) - 3}</span>}
           </span>
         </button>
 
@@ -90,11 +101,8 @@ export function TaskRow({
         </span>
 
         {task.assignee ? (
-          <span
-            className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-2xs font-semibold text-ink-onAccent sm:flex"
-            title={task.assignee.displayName}
-          >
-            {task.assignee.displayName?.[0]?.toUpperCase()}
+          <span className="hidden shrink-0 sm:block" title={task.assignee.displayName}>
+            <Avatar name={task.assignee.displayName} src={task.assignee.avatarUrl} size="xs" />
           </span>
         ) : (
           <span

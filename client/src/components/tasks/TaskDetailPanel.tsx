@@ -10,6 +10,7 @@ import { CommentList } from '../comments/CommentList';
 import { FileAttachments } from '../files/FileAttachments';
 import { TaskTimer } from '../timeTracking/TaskTimer';
 import { TaskDependencies } from './TaskDependencies';
+import { TaskTags } from './TaskTags';
 import { STATUS_COLOR } from '../../constants/taskStyles';
 
 const TABS = [
@@ -207,6 +208,8 @@ export function TaskDetailPanel({
                   </form>
                 )}
               </div>
+
+              <TaskTags taskId={taskId} projectId={projectId} tags={task?.tags ?? []} canEdit={canEdit} />
 
               <TaskDependencies taskId={taskId} projectId={projectId} canEdit={canEdit} />
             </>

@@ -4,7 +4,7 @@ import { authorizeProject } from '../../middlewares/authorize';
 import { validate } from '../../middlewares/validate';
 import { enforceProjectQuota, enforceMemberQuota } from '../../middlewares/requirePlan';
 import * as ctrl from './projects.controller';
-import { createProjectSchema, updateProjectSchema, addMemberSchema, updateMemberSchema, createColumnSchema, updateColumnSchema } from './projects.schema';
+import { createProjectSchema, updateProjectSchema, addMemberSchema, updateMemberSchema, createColumnSchema, updateColumnSchema, addTagSchema } from './projects.schema';
 
 const router = Router();
 
@@ -27,5 +27,7 @@ router.patch('/:projectId/columns/:columnId', authorizeProject('OWNER', 'MANAGER
 router.delete('/:projectId/columns/:columnId', authorizeProject('OWNER', 'MANAGER'), ctrl.deleteColumn);
 
 router.get('/:projectId/tags', authorizeProject('OWNER', 'MANAGER', 'MEMBER', 'VIEWER'), ctrl.getTags);
+router.post('/:projectId/tags', authorizeProject('OWNER', 'MANAGER', 'MEMBER'), validate(addTagSchema), ctrl.addTag);
+router.delete('/:projectId/tags/:tagId', authorizeProject('OWNER', 'MANAGER'), ctrl.removeTag);
 
 export default router;

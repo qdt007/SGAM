@@ -29,6 +29,16 @@ export const updateNotificationPrefs = asyncHandler(async (req: Request, res: Re
   success(res, await svc.updateNotificationPrefs(req.user!.userId, req.body));
 });
 
+export const setAvatar = asyncHandler(async (req: Request, res: Response) => {
+  const file = req.file as Express.Multer.File | undefined;
+  if (!file) throw Object.assign(new Error('No image uploaded'), { status: 400 });
+  success(res, await svc.setAvatar(req.user!.userId, file));
+});
+
+export const removeAvatar = asyncHandler(async (req: Request, res: Response) => {
+  success(res, await svc.removeAvatar(req.user!.userId));
+});
+
 export const getById = asyncHandler(async (req: Request, res: Response) => {
   success(res, await svc.getById(req.params.id));
 });

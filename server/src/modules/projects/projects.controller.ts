@@ -63,3 +63,12 @@ export const deleteColumn = asyncHandler(async (req: Request, res: Response) => 
 export const getTags = asyncHandler(async (req: Request, res: Response) => {
   success(res, await svc.getTags(req.params.projectId));
 });
+
+export const addTag = asyncHandler(async (req: Request, res: Response) => {
+  success(res, await svc.addTag(req.params.projectId, req.body), 201);
+});
+
+export const removeTag = asyncHandler(async (req: Request, res: Response) => {
+  await svc.removeTag(req.params.projectId, req.params.tagId);
+  success(res, { message: 'Tag removed from project' });
+});

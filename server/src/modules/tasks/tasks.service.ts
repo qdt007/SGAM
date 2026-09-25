@@ -189,3 +189,28 @@ export async function verifyTaskBelongsToProject(taskId: string, projectId: stri
   if (!task) throw Object.assign(new Error('Task not found in this project'), { status: 404 });
   return task;
 }
+
+/**
+ * Replaces the task's whole tag set. Tags not linked to the task's own project are rejected
+ * rather than silently dropped, so a bad id is visible instead of quietly doing nothing.
+ */
+export async function setTags(taskId: string, tagIds: string[]) {
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { projectId: true } });
+  if (!task) throw Object.assign(new Error('Task not found'), { status: 404 });
+
+  if (tagIds.length) {
+    const allowed = await prisma.projectTag.findMany({
+      where: { projectId: task.projectId, tagId: { in: tagIds } },
+      select: { tagId: true },
+    });
+    if (allowed.length !== new Set(tagIds).size) {
+      throw Object.assign(new Error('One or more tags do not belong to this project'), { status: 400 });
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.taskTag.deleteMany({ where: { taskId } }),
+    ...(tagIds.length ? [prisma.taskTag.createMany({ data: tagIds.map((tagId) => ({ taskId, tagId })) })] : []),
+  ]);
+  return getTask(taskId);
+}

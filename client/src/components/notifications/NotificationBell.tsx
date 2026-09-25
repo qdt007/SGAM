@@ -24,7 +24,7 @@ export function NotificationBell() {
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAllNotifications } = useNotifications();
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -65,14 +65,24 @@ export function NotificationBell() {
         <div className="absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-2rem)] z-50 rounded-xl border border-black/[0.06] bg-raised shadow-modal overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
             <p className="text-sm font-semibold text-ink">Notifications</p>
-            {unreadCount > 0 && (
-              <button
-                onClick={() => markAllAsRead()}
-                className="text-xs text-primary hover:underline dark:text-primary"
-              >
-                Mark all read
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <button
+                  onClick={() => markAllAsRead()}
+                  className="text-xs text-primary hover:underline dark:text-primary"
+                >
+                  Mark all read
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={() => clearAllNotifications()}
+                  className="text-xs text-ink-muted hover:underline"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="max-h-[420px] overflow-y-auto">

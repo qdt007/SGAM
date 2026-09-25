@@ -155,6 +155,32 @@ export async function deleteColumn(columnId: string) {
   emitToProject(column.projectId, SOCKET_EVENTS.COLUMN_UPDATED, { action: 'deleted', column });
 }
 
+/**
+ * Tag.name is unique across the whole table, so a name another project already uses is reused
+ * rather than duplicated. Tags are global rows; ProjectTag is what scopes one to a project.
+ */
+export async function addTag(projectId: string, input: { name: string; color?: string }) {
+  const name = input.name.trim();
+  const tag = await prisma.tag.upsert({
+    where: { name },
+    create: { name, color: input.color ?? '#6366f1' },
+    update: input.color ? { color: input.color } : {},
+  });
+  await prisma.projectTag.upsert({
+    where: { projectId_tagId: { projectId, tagId: tag.id } },
+    create: { projectId, tagId: tag.id },
+    update: {},
+  });
+  return tag;
+}
+
+/** Unlinks the tag from this project. The Tag row survives because other projects may use it. */
+export async function removeTag(projectId: string, tagId: string) {
+  await prisma.projectTag.deleteMany({ where: { projectId, tagId } });
+  // Task assignments inside this project would otherwise point at a tag the project no longer has.
+  await prisma.taskTag.deleteMany({ where: { tagId, task: { projectId } } });
+}
+
 export async function getTags(projectId: string) {
   const projectTags = await prisma.projectTag.findMany({
     where: { projectId },

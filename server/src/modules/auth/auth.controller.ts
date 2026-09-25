@@ -6,6 +6,11 @@ export const register = asyncHandler(async (req: Request, res: Response) => { su
 export const login = asyncHandler(async (req: Request, res: Response) => { success(res, await authService.login(req.body)); });
 export const refresh = asyncHandler(async (req: Request, res: Response) => { success(res, await authService.refreshTokens(req.body.refreshToken)); });
 export const logout = asyncHandler(async (req: Request, res: Response) => { if (req.body.refreshToken) await authService.logout(req.body.refreshToken); success(res, { message: 'Logged out' }); });
+export const logoutEverywhere = asyncHandler(async (req: Request, res: Response) => {
+  const revoked = await authService.logoutEverywhere(req.user!.userId);
+  success(res, { revoked, message: 'Signed out on every device. You will need to sign in again.' });
+});
+
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) { error(res, 'Not authenticated', 401); return; }
   success(res, await authService.getMe(req.user.userId));

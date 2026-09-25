@@ -10,6 +10,7 @@ import { NotificationBell } from '../notifications/NotificationBell';
 import { ActiveTimerBadge } from '../timeTracking/ActiveTimerBadge';
 import { PlanBadge } from '../billing/UpgradePrompt';
 import { usePlan } from '../../hooks/usePlan';
+import { Avatar } from '../ui/Avatar';
 
 /* ─── Brand mark ─────────────────────────────────── */
 function SgamLogo({ size = 32 }: { size?: number }) {
@@ -111,9 +112,7 @@ function AccountMenu({ collapsed, onLogout }: { collapsed: boolean; onLogout: ()
           collapsed && 'justify-center',
         )}
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-2xs font-semibold text-ink-onAccent">
-          {user.displayName?.[0]?.toUpperCase()}
-        </span>
+        <Avatar name={user.displayName} src={user.avatarUrl} size="sm" />
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">

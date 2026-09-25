@@ -83,6 +83,9 @@ model User {
   passwordHash String
   displayName  String
   avatarUrl    String?
+  // Storage key of the uploaded avatar, so the old blob can be deleted when it is replaced.
+  // Null when the avatar is an external URL or was never set.
+  avatarKey    String?
   globalRole   GlobalRole @default(USER)
   isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())

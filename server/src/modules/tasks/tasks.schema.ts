@@ -30,3 +30,8 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type MoveTaskInput = z.infer<typeof moveTaskSchema>;
 export type AddDependencyInput = z.infer<typeof addDependencySchema>;
+
+export const setTaskTagsSchema = z.object({
+  tagIds: z.array(z.string().uuid()).max(20),
+});
+export type SetTaskTagsInput = z.infer<typeof setTaskTagsSchema>;

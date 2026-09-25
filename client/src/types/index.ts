@@ -71,7 +71,7 @@ export interface Task {
   assignee?: User | null;
   creator?: User;
   subtasks?: Task[];
-  tags?: Tag[];
+  tags?: TaskTag[];
   _count?: { comments: number; subtasks: number; timeLogs: number };
 }
 export interface TaskDependency {
@@ -85,6 +85,12 @@ export interface Tag {
   id: string;
   name: string;
   color: string;
+}
+/** What `GET /tasks/:id` actually returns for tags: the join row with the tag nested inside. */
+export interface TaskTag {
+  taskId: string;
+  tagId: string;
+  tag: Tag;
 }
 export interface Mention {
   mentionedId: string;
