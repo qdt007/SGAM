@@ -174,7 +174,10 @@ export async function handleVnpayIpn(query: Record<string, string>): Promise<Ipn
   }
   if (payment.status === 'PAID') return { RspCode: '02', Message: 'Order already confirmed' };
 
-  if (query.vnp_ResponseCode !== '00') {
+  // Both fields must say 00. VNPay's own sample joins them with OR, which would bank a payment
+  // the gateway itself recorded as failed; vnp_TransactionStatus is the one that describes what
+  // actually happened at VNPay, and the docs mark both as required.
+  if (query.vnp_ResponseCode !== '00' || query.vnp_TransactionStatus !== '00') {
     await prisma.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.FAILED } });
     // Still 00: the message was received and handled, so VNPay should stop resending it.
     return { RspCode: '00', Message: 'Confirm Success' };
@@ -193,7 +196,7 @@ export async function readVnpayReturn(query: Record<string, string>) {
     : null;
   return {
     valid,
-    succeeded: valid && query.vnp_ResponseCode === '00',
+    succeeded: valid && query.vnp_ResponseCode === '00' && query.vnp_TransactionStatus === '00',
     // The IPN usually lands first, but not always; the page says "processing" rather than lying.
     settled: payment?.status === 'PAID',
     providerRef: ref,
