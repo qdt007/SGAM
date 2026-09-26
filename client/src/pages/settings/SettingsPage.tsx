@@ -22,15 +22,6 @@ const apiMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
   fallback;
 
-const ACCENT_COLORS = [
-  { name: 'Terracotta', value: '#C2410C' },
-  { name: 'Sienna', value: '#9A3412' },
-  { name: 'Amber', value: '#F59E0B' },
-  { name: 'Ochre', value: '#D97706' },
-  { name: 'Moss', value: '#16A34A' },
-  { name: 'Stone', value: '#78716C' },
-];
-
 type Section = 'profile' | 'appearance' | 'notifications' | 'billing' | 'security';
 
 const MENU: { id: Section; label: string; icon: React.ElementType; desc: string }[] = [
@@ -210,7 +201,6 @@ function ProfileSection() {
 
 function AppearanceSection() {
   const { theme, toggleTheme } = useUIStore();
-  const [selectedColor, setSelectedColor] = useState(ACCENT_COLORS[0].value);
 
   return (
     <div className="space-y-6">
@@ -241,25 +231,6 @@ function AppearanceSection() {
               </button>
             ))}
           </div>
-        </div>
-
-        <div>
-          <label className="label">Accent Color</label>
-          <div className="flex gap-2 mt-1 flex-wrap">
-            {ACCENT_COLORS.map((c) => (
-              <button
-                key={c.value}
-                title={c.name}
-                onClick={() => setSelectedColor(c.value)}
-                className={cn(
-                  'h-8 w-8 rounded-full border-2 transition-transform',
-                  selectedColor === c.value ? 'border-line dark:border-white scale-110' : 'border-transparent',
-                )}
-                style={{ backgroundColor: c.value }}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-ink-subtle mt-2">Accent color preference is saved locally.</p>
         </div>
       </div>
     </div>

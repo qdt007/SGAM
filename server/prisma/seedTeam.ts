@@ -12,9 +12,10 @@
  */
 import 'dotenv/config';
 import crypto from 'crypto';
-import { PrismaClient, ProjectRole } from '@prisma/client';
+import { PrismaClient, ProjectRole, BillingCycle, PaymentStatus } from '@prisma/client';
 import { hashPassword } from '../src/utils/hash';
 import { saveFile } from '../src/config/storage';
+import { periodEndFrom, priceFor } from '../src/constants/plans';
 
 const prisma = new PrismaClient();
 
@@ -34,15 +35,20 @@ interface Member {
   role: ProjectRole;
   /** Wikipedia article whose lead image becomes the avatar. */
   portrait: string;
+  /**
+   * Billing history to fabricate. Null leaves the account on FREE — a workspace where everyone
+   * happens to be a paying customer does not look like a real one.
+   */
+  billing?: { cycle: BillingCycle; boughtDaysAgo: number; renewals?: number };
 }
 
 /** Gia Hân leads the group, so she owns the project; everyone else can create and edit. */
 const TEAM: Member[] = [
-  { email: 'giahan@sgam.com', username: 'giahan', displayName: 'Gia Hân', role: 'OWNER', portrait: 'Scarlett_Johansson' },
-  { email: 'hoaingoc@sgam.com', username: 'hoaingoc', displayName: 'Hoài Ngọc', role: 'MEMBER', portrait: 'Elizabeth_Olsen' },
-  { email: 'minhquan@sgam.com', username: 'minhquan', displayName: 'Minh Quân', role: 'MEMBER', portrait: 'Robert_Downey_Jr.' },
+  { email: 'giahan@sgam.com', username: 'giahan', displayName: 'Gia Hân', role: 'OWNER', portrait: 'Scarlett_Johansson', billing: { cycle: 'YEARLY', boughtDaysAgo: 40 } },
+  { email: 'hoaingoc@sgam.com', username: 'hoaingoc', displayName: 'Hoài Ngọc', role: 'MEMBER', portrait: 'Elizabeth_Olsen', billing: { cycle: 'MONTHLY', boughtDaysAgo: 9, renewals: 2 } },
+  { email: 'minhquan@sgam.com', username: 'minhquan', displayName: 'Minh Quân', role: 'MEMBER', portrait: 'Robert_Downey_Jr.', billing: { cycle: 'MONTHLY', boughtDaysAgo: 3 } },
   { email: 'trongquy@sgam.com', username: 'trongquy', displayName: 'Phan Trong Quy', role: 'MEMBER', portrait: 'Chris_Hemsworth' },
-  { email: 'truongvu@sgam.com', username: 'truongvu', displayName: 'Truong Vu', role: 'MEMBER', portrait: 'Chris_Evans_(actor)' },
+  { email: 'truongvu@sgam.com', username: 'truongvu', displayName: 'Truong Vu', role: 'MEMBER', portrait: 'Chris_Evans_(actor)', billing: { cycle: 'YEARLY', boughtDaysAgo: 16 } },
   { email: 'quynh@sgam.com', username: 'quynh', displayName: 'Quỳnh Quỳnh', role: 'MEMBER', portrait: 'Brie_Larson' },
 ];
 
@@ -77,6 +83,64 @@ async function fetchPortrait(article: string): Promise<string | null> {
   }
 }
 
+const daysAgo = (n: number): Date => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+
+/**
+ * Gives an account a Pro subscription with the payments that paid for it.
+ *
+ * The rows are marked `SEED` rather than `MOCK` or `VNPAY` so a re-run can find and replace
+ * exactly what it wrote before — without that, every run would stack another period onto the
+ * subscription and inflate the revenue figure on the admin dashboard.
+ *
+ * Renewals are backdated one cycle apart so the payment history reads like a real one instead
+ * of several charges landing on the same afternoon.
+ */
+async function seedBilling(userId: string, billing: NonNullable<Member['billing']>) {
+  const { cycle, boughtDaysAgo, renewals = 1 } = billing;
+  const amount = priceFor(cycle);
+
+  const subscription = await prisma.subscription.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+    select: { id: true },
+  });
+
+  await prisma.payment.deleteMany({ where: { userId, provider: 'SEED' } });
+
+  const cycleDays = cycle === 'YEARLY' ? 365 : 30;
+  for (let i = 0; i < renewals; i++) {
+    // i = 0 is the most recent charge; earlier ones step back a full cycle each.
+    const paidAt = daysAgo(boughtDaysAgo + i * cycleDays);
+    await prisma.payment.create({
+      data: {
+        subscriptionId: subscription.id,
+        userId,
+        amount,
+        cycle,
+        status: PaymentStatus.PAID,
+        provider: 'SEED',
+        providerRef: `SEED-${userId.slice(0, 8)}-${i}`,
+        paidAt,
+        createdAt: paidAt,
+      },
+    });
+  }
+
+  const startedAt = daysAgo(boughtDaysAgo + (renewals - 1) * cycleDays);
+  await prisma.subscription.update({
+    where: { userId },
+    data: {
+      tier: 'PRO',
+      status: 'ACTIVE',
+      cycle,
+      startedAt,
+      currentPeriodEnd: periodEndFrom(daysAgo(boughtDaysAgo), cycle),
+      cancelAtPeriodEnd: false,
+    },
+  });
+}
+
 /** The demo account is the one signed in during development; keep it able to manage the project. */
 const DEMO_EMAIL = 'demo@test.com';
 
@@ -94,7 +158,8 @@ async function main() {
         create: { email: m.email, username: m.username, displayName: m.displayName, passwordHash, avatarUrl },
         select: { id: true, email: true, displayName: true, avatarUrl: true },
       });
-      return { ...user, role: m.role };
+      if (m.billing) await seedBilling(user.id, m.billing);
+      return { ...user, role: m.role, tier: m.billing ? 'PRO' : 'FREE' };
     }),
   );
 
@@ -135,8 +200,9 @@ async function main() {
   Password for accounts created by this run: ${PASSWORD}
   (Existing accounts keep whatever password they already had.)
 
-${users.map((u) => `    ${u.role.padEnd(7)} ${u.email.padEnd(22)} ${u.displayName}`).join('\n')}
-${demo ? `    OWNER   ${DEMO_EMAIL.padEnd(22)} (tài khoản demo của bạn)` : ''}
+${users.map((u) => `    ${u.role.padEnd(7)} ${u.tier.padEnd(4)} ${u.email.padEnd(22)} ${u.displayName.padEnd(16)} ${u.avatarUrl ? 'anh ok' : 'thieu anh'}`).join('\n')}
+')}
+${demo ? `    OWNER        ${DEMO_EMAIL.padEnd(22)} (tài khoản demo của bạn)` : ''}
 
   Everyone should change their password in Settings after signing in.
 `);
