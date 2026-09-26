@@ -80,12 +80,21 @@ model User {
   id           String     @id @default(uuid())
   email        String     @unique
   username     String     @unique
-  passwordHash String
+  // Null for accounts created through Google: there is no password to compare against, and
+  // password login refuses them by name rather than failing with "invalid credentials".
+  passwordHash String?
+  googleId     String?    @unique
   displayName  String
   avatarUrl    String?
   // Storage key of the uploaded avatar, so the old blob can be deleted when it is replaced.
   // Null when the avatar is an external URL or was never set.
   avatarKey    String?
+  // TOTP two-factor. The secret exists as soon as setup starts but only counts once
+  // twoFactorEnabled flips, so an abandoned setup never locks anyone out.
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean  @default(false)
+  // bcrypt hashes of single-use recovery codes; the plaintext is shown once and never stored.
+  twoFactorBackupCodes String[]
   globalRole   GlobalRole @default(USER)
   isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())

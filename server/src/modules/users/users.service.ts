@@ -90,6 +90,11 @@ export async function removeAvatar(userId: string) {
 export async function changePassword(userId: string, input: ChangePasswordInput) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, passwordHash: true } });
   if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
+  // Google-created accounts have nothing to compare against; changing a password they never
+  // set is a different flow, not this one.
+  if (!user.passwordHash) {
+    throw Object.assign(new Error('This account signs in with Google and has no password.'), { status: 409 });
+  }
   if (!(await comparePassword(input.currentPassword, user.passwordHash))) {
     throw Object.assign(new Error('Current password is incorrect'), { status: 400 });
   }
