@@ -58,6 +58,11 @@ const NAV_SECONDARY = [
   { to: '/settings', icon: 'ph:gear-six-duotone', activeIcon: 'ph:gear-six-fill', label: 'Settings' },
 ];
 
+// Shown only to global admins. Hiding it is presentation; the API is what actually refuses.
+const NAV_ADMIN = [
+  { to: '/admin', icon: 'ph:shield-star-duotone', activeIcon: 'ph:shield-star-fill', label: 'Admin' },
+];
+
 function NavSection({ items, collapsed }: { items: typeof NAV; collapsed: boolean }) {
   return (
     <div className="space-y-0.5">
@@ -162,6 +167,8 @@ function AccountMenu({ collapsed, onLogout }: { collapsed: boolean; onLogout: ()
 /* ─── Shell ──────────────────────────────────────── */
 export function Layout({ children }: { children: React.ReactNode }) {
   const { clearAuth } = useAuthStore();
+  // Subscribed rather than read once, so promoting yourself elsewhere reveals the nav entry.
+  const isAdmin = useAuthStore((s) => s.user?.globalRole === 'ADMIN');
   const { theme } = useUIStore();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -224,6 +231,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {!isCollapsed && <p className="section-label mb-1.5 px-2.5">Account</p>}
             <NavSection items={NAV_SECONDARY} collapsed={isCollapsed} />
           </div>
+          {isAdmin && (
+            <div>
+              {!isCollapsed && <p className="section-label mb-1.5 px-2.5">System</p>}
+              <NavSection items={NAV_ADMIN} collapsed={isCollapsed} />
+            </div>
+          )}
         </nav>
 
         <div className="border-t border-line-soft p-2.5">

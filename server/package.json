@@ -12,7 +12,8 @@
     "prisma:studio": "prisma studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed": "ts-node --transpile-only prisma/seed.ts"
+    "seed": "ts-node --transpile-only prisma/seed.ts",
+    "seed:team": "ts-node --transpile-only prisma/seedTeam.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",

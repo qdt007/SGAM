@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
+import { AdminOnly } from './AdminOnly';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
 import { Layout } from '../components/layout/Layout';
@@ -12,6 +13,7 @@ const KanbanPage = lazy(() => import('../pages/kanban/KanbanPage').then((m) => (
 const GanttPage = lazy(() => import('../pages/gantt/GanttPage').then((m) => ({ default: m.GanttPage })));
 const ReportsPage = lazy(() => import('../pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('../pages/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const AdminPage = lazy(() => import('../pages/admin/AdminPage').then((m) => ({ default: m.AdminPage })));
 const GoogleCallbackPage = lazy(() => import('../pages/auth/GoogleCallbackPage').then((m) => ({ default: m.GoogleCallbackPage })));
 
 function Spinner() {
@@ -35,6 +37,7 @@ function AppLayout() {
           <Route path="projects/:projectId/gantt" element={<GanttPage />} />
           <Route path="projects/:projectId/reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="admin" element={<AdminOnly><AdminPage /></AdminOnly>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>

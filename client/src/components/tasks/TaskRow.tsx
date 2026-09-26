@@ -9,6 +9,7 @@ import { STATUS_LABEL, STATUS_BADGE, PRIORITY_DOT, PRIORITY_LABEL } from '../../
 import { EditTaskModal } from './EditTaskModal';
 import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog } from '../ui/Modal';
+import { Pencil, Trash2 } from 'lucide-react';
 
 export function TaskRow({
   task,
@@ -117,7 +118,7 @@ export function TaskRow({
 
         <span className="flex shrink-0 items-center gap-0.5 row-action">
           <button onClick={() => setShowEdit(true)} className="btn-ghost btn-icon-sm" aria-label={`Edit ${task.title}`}>
-            <Icon icon="ph:pencil-simple" width={15} aria-hidden />
+            <Pencil size={15} aria-hidden />
           </button>
           <button
             onClick={() => setShowDelete(true)}
@@ -125,7 +126,7 @@ export function TaskRow({
             className="btn-quiet-danger btn-icon-sm"
             aria-label={`Delete ${task.title}`}
           >
-            <Icon icon="ph:trash" width={15} aria-hidden />
+            <Trash2 size={15} aria-hidden />
           </button>
         </span>
       </div>
