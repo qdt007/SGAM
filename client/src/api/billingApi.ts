@@ -68,6 +68,8 @@ export interface CheckoutSession {
   createdAt: string;
   reused: boolean;
   simulated: boolean;
+  /** Present only when a real gateway is configured; the browser is sent here to pay. */
+  paymentUrl?: string;
 }
 
 export const billingApi = {

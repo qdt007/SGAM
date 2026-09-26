@@ -6,7 +6,10 @@ import { usersApi, NotificationPrefs } from '../../api/usersApi';
 import { authApi } from '../../api/authApi';
 import { Page, PageHeader } from '../../components/ui/Page';
 import { Tabs } from '../../components/ui/Tabs';
+import { ConfirmDialog } from '../../components/ui/Modal';
+import { TwoFactorSection } from '../../components/settings/TwoFactorSection';
 import { Avatar } from '../../components/ui/Avatar';
+import { ImageCropper } from '../../components/ui/ImageCropper';
 import { BillingSection } from '../../components/billing/BillingSection';
 import { keys } from '../../constants/queryKeys';
 import { useAuthStore } from '../../stores/authStore';
@@ -38,18 +41,23 @@ const MENU: { id: Section; label: string; icon: React.ElementType; desc: string 
   { id: 'security', label: 'Security', icon: Shield, desc: 'Password and access' },
 ];
 
-const AVATAR_MAX_MB = 2;
+// The cropper re-encodes to a 512px PNG, so what reaches the server is always small. This
+// ceiling only bounds how large an image we are willing to decode in the browser.
+const AVATAR_SOURCE_MAX_MB = 10;
 const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 
 function AvatarField() {
   const { user, updateUser } = useAuthStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  // Held between picking a file and confirming the crop; nothing is uploaded until then.
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const upload = useMutation({
     mutationFn: (file: File) => usersApi.uploadAvatar(file),
-    onSuccess: (updated) => { updateUser(updated); setError(''); },
-    onError: (e) => setError(apiMessage(e, 'Could not upload that image')),
+    onSuccess: (updated) => { updateUser(updated); setError(''); setPendingFile(null); },
+    onError: (e) => { setError(apiMessage(e, 'Could not upload that image')); setPendingFile(null); },
   });
 
   const remove = useMutation({
@@ -62,8 +70,11 @@ function AvatarField() {
     if (!file) return;
     // Checked here too so the common mistakes fail instantly instead of after an upload.
     if (!AVATAR_TYPES.includes(file.type)) return setError('Use a PNG, JPEG, WebP or GIF image.');
-    if (file.size > AVATAR_MAX_MB * 1024 * 1024) return setError(`Keep the image under ${AVATAR_MAX_MB}MB.`);
-    upload.mutate(file);
+    if (file.size > AVATAR_SOURCE_MAX_MB * 1024 * 1024) {
+      return setError(`Pick an image under ${AVATAR_SOURCE_MAX_MB}MB.`);
+    }
+    setError('');
+    setPendingFile(file);
   };
 
   const busy = upload.isPending || remove.isPending;
@@ -84,12 +95,12 @@ function AvatarField() {
             {upload.isPending ? 'Uploading...' : user?.avatarUrl ? 'Change photo' : 'Upload photo'}
           </button>
           {user?.avatarUrl && (
-            <button onClick={() => remove.mutate()} disabled={busy} className="btn-ghost text-sm py-1.5 text-ink-muted">
+            <button onClick={() => setConfirmRemove(true)} disabled={busy} className="btn-ghost text-sm py-1.5 text-ink-muted">
               {remove.isPending ? 'Removing...' : 'Remove'}
             </button>
           )}
         </div>
-        <p className="text-xs text-ink-subtle">PNG, JPEG, WebP or GIF, up to {AVATAR_MAX_MB}MB.</p>
+        <p className="text-xs text-ink-subtle">PNG, JPEG, WebP or GIF. You choose the crop next.</p>
         {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
       <input
@@ -99,6 +110,29 @@ function AvatarField() {
         className="hidden"
         onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }}
       />
+
+      {pendingFile && (
+        <ImageCropper
+          file={pendingFile}
+          busy={upload.isPending}
+          onCancel={() => setPendingFile(null)}
+          onCropped={(cropped) => upload.mutate(cropped)}
+        />
+      )}
+
+      {confirmRemove && (
+        <ConfirmDialog
+          title="Remove your photo?"
+          message="The image is deleted from storage, so you would need the original file to put it back."
+          confirmLabel="Remove photo"
+          loading={remove.isPending}
+          onConfirm={() => {
+            remove.mutate();
+            setConfirmRemove(false);
+          }}
+          onClose={() => setConfirmRemove(false)}
+        />
+      )}
     </div>
   );
 }
@@ -434,6 +468,8 @@ function SecuritySection() {
             </button>
           </form>
         )}
+
+        <TwoFactorSection />
 
         <div className="flex items-center justify-between gap-4 rounded-lg bg-sunken px-4 py-3">
           <div>

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { billingApi, formatVnd, BillingCycle, PlanDefinition } from '../../api/billingApi';
@@ -67,13 +68,23 @@ function CheckoutModal({ cycle, onClose }: { cycle: BillingCycle; onClose: () =>
           )}
         </div>
 
-        <div className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/[0.07] px-3 py-2.5 text-caption text-warning">
-          <Icon icon="ph:info-fill" width={14} className="mt-px shrink-0" aria-hidden />
-          <span>
-            Đây là thanh toán <b>mô phỏng</b> cho mục đích demo. Không có cổng thanh toán thật và không có tiền nào
-            được trừ. Để dùng thật cần tích hợp VNPay/MoMo và xác thực callback từ cổng.
-          </span>
-        </div>
+        {session.data?.paymentUrl ? (
+          <div className="flex items-start gap-2 rounded-lg border border-line bg-sunken px-3 py-2.5 text-caption text-ink-muted">
+            <Icon icon="ph:shield-check-fill" width={14} className="mt-px shrink-0 text-success" aria-hidden />
+            <span>
+              Bạn sẽ được chuyển sang <b>VNPay</b> để thanh toán. Gói Pro chỉ được bật sau khi VNPay xác nhận, nên
+              đừng đóng trình duyệt giữa chừng.
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/[0.07] px-3 py-2.5 text-caption text-warning">
+            <Icon icon="ph:info-fill" width={14} className="mt-px shrink-0" aria-hidden />
+            <span>
+              Máy chủ này chưa cấu hình cổng thanh toán nên đây là thanh toán <b>mô phỏng</b>: không có tiền nào được
+              trừ. Đặt VNPAY_TMN_CODE và VNPAY_HASH_SECRET để bật thanh toán thật.
+            </span>
+          </div>
+        )}
 
         <div className="modal-footer">
           <button type="button" onClick={onClose} className="btn-secondary btn-sm">
@@ -82,11 +93,19 @@ function CheckoutModal({ cycle, onClose }: { cycle: BillingCycle; onClose: () =>
           <button
             type="button"
             disabled={!session.data || confirm.isPending}
-            onClick={() => session.data && confirm.mutate(session.data.providerRef)}
+            onClick={() => {
+              if (!session.data) return;
+              // A real gateway owns the next step: hand the browser over and let the IPN decide.
+              if (session.data.paymentUrl) {
+                window.location.href = session.data.paymentUrl;
+                return;
+              }
+              confirm.mutate(session.data.providerRef);
+            }}
             className="btn-primary btn-sm"
           >
             {confirm.isPending && <Icon icon="ph:circle-notch" width={14} className="animate-spin" aria-hidden />}
-            Thanh toán {session.data ? formatVnd(amount) : ''}
+            {session.data?.paymentUrl ? 'Tới VNPay' : 'Thanh toán'} {session.data ? formatVnd(amount) : ''}
           </button>
         </div>
       </div>
@@ -158,11 +177,40 @@ function PlanCard({
 /* ─── Section ────────────────────────────────────── */
 export function BillingSection() {
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [cycle, setCycle] = useState<BillingCycle>('YEARLY');
   const [checkout, setCheckout] = useState<BillingCycle | null>(null);
   const [error, setError] = useState('');
 
+  // VNPay sends the customer back here with the outcome. The IPN is what actually grants Pro,
+  // and it can land a moment later, so a success with settled=0 says "processing", not "done".
+  const paymentResult = searchParams.get('payment');
+  const settled = searchParams.get('settled') === '1';
+
+  useEffect(() => {
+    if (!paymentResult) return;
+    qc.invalidateQueries({ queryKey: planKeys.me });
+    const t = setTimeout(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('payment');
+      next.delete('settled');
+      setSearchParams(next, { replace: true });
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [paymentResult, qc, searchParams, setSearchParams]);
+
   const { isPro, tier, subscription, usage, payments, isLoading } = usePlan();
+
+  const banner =
+    paymentResult === 'success'
+      ? settled
+        ? { tone: 'success' as const, text: 'Thanh toán thành công. Gói Pro đã được kích hoạt.' }
+        : { tone: 'info' as const, text: 'VNPay đã nhận thanh toán. Đang chờ xác nhận, gói Pro sẽ bật trong giây lát.' }
+      : paymentResult === 'failed'
+        ? { tone: 'error' as const, text: 'Giao dịch không thành công hoặc đã bị huỷ. Bạn chưa bị trừ tiền.' }
+        : paymentResult === 'invalid'
+          ? { tone: 'error' as const, text: 'Không xác thực được phản hồi từ cổng thanh toán. Hãy thử lại.' }
+          : null;
   const { data: catalogue } = useQuery({ queryKey: planKeys.plans, queryFn: billingApi.plans });
 
   const cancel = useMutation({
@@ -184,6 +232,26 @@ export function BillingSection() {
       </div>
 
       <InlineError message={error} />
+
+      {banner && (
+        <div
+          className={cn(
+            'flex items-start gap-2 rounded-lg border px-3 py-2.5 text-small',
+            banner.tone === 'success' && 'border-success/30 bg-success/[0.07] text-success',
+            banner.tone === 'info' && 'border-line bg-sunken text-ink-muted',
+            banner.tone === 'error' && 'border-red-500/30 bg-red-500/[0.06] text-red-600 dark:text-red-400',
+          )}
+          role="status"
+        >
+          <Icon
+            icon={banner.tone === 'success' ? 'ph:check-circle-fill' : banner.tone === 'info' ? 'ph:clock-fill' : 'ph:warning-circle-fill'}
+            width={16}
+            className="mt-px shrink-0"
+            aria-hidden
+          />
+          <span>{banner.text}</span>
+        </div>
+      )}
 
       {/* Current plan */}
       <div className="rounded-xl border border-line bg-sunken p-4">

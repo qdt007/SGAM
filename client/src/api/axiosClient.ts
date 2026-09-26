@@ -52,9 +52,10 @@ api.interceptors.response.use(
       const stored = localStorage.getItem('auth-storage');
       const refreshToken = stored ? JSON.parse(stored)?.state?.refreshToken : null;
       const res = await axios.post(BASE_URL + '/auth/refresh', { refreshToken });
-      const { accessToken } = res.data.data;
+      const { accessToken, refreshToken: rotated } = res.data.data;
       const { useAuthStore } = await import('../stores/authStore');
-      useAuthStore.getState().setAccessToken(accessToken);
+      // Keep the rotated refresh token: the one we just spent was deleted server-side.
+      useAuthStore.getState().setAccessToken(accessToken, rotated);
       processQueue(null, accessToken);
       original.headers.Authorization = `Bearer ${accessToken}`;
       return api(original);

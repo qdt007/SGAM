@@ -39,7 +39,7 @@ export function RegisterPage() {
         password: data.password,
         displayName: data.displayName,
       });
-      setAuth(r.user, r.accessToken);
+      setAuth(r.user, r.accessToken, r.refreshToken);
       navigate('/dashboard');
     } catch (err: unknown) {
       setServerError(

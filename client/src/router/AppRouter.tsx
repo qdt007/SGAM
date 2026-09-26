@@ -12,6 +12,7 @@ const KanbanPage = lazy(() => import('../pages/kanban/KanbanPage').then((m) => (
 const GanttPage = lazy(() => import('../pages/gantt/GanttPage').then((m) => ({ default: m.GanttPage })));
 const ReportsPage = lazy(() => import('../pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('../pages/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const GoogleCallbackPage = lazy(() => import('../pages/auth/GoogleCallbackPage').then((m) => ({ default: m.GoogleCallbackPage })));
 
 function Spinner() {
   return (
@@ -48,6 +49,7 @@ export function AppRouter() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/auth/google" element={<GoogleCallbackPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/*" element={<AppLayout />} />
           </Route>
