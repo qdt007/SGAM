@@ -108,12 +108,19 @@ describe('two-factor and Google sign-in', () => {
     expect(res.status).toBe(422);
   });
 
-  it('sends /auth/google to Google with a signed state', async () => {
+  it('hands back a Google URL with a signed state rather than redirecting to it', async () => {
     const res = await request(app).get('/api/auth/google');
-    expect(res.status).toBe(302);
-    const url = new URL(res.headers.location);
+    expect(res.status).toBe(200);
+    const url = new URL(res.body.data.url);
     expect(url.origin).toBe('https://accounts.google.com');
     expect(url.searchParams.get('state')?.split('.')).toHaveLength(3);
+  });
+
+  // Redirecting from this origin to a Google sign-in page is what got the route flagged as
+  // phishing, so the absence of a redirect is the thing worth guarding.
+  it('does not redirect to Google itself', async () => {
+    const res = await request(app).get('/api/auth/google');
+    expect(res.headers.location).toBeUndefined();
   });
 
   it('bounces a callback with a forged state back to the client, not into the app', async () => {

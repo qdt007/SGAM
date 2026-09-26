@@ -15,9 +15,8 @@ export type SignInResult =
   | { requiresTwoFactor?: undefined; user: User; accessToken: string; refreshToken: string };
 
 export const authApi = {
-  googleUrl: (): string => (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL
-    ? `${(import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL}/auth/google`
-    : '/api/auth/google',
+  /** Fetches the Google authorize URL, then the caller navigates there from this origin. */
+  googleUrl: async (): Promise<string> => (await api.get('/auth/google')).data.data.url,
   twoFactorStatus: async (): Promise<TwoFactorStatus> => (await api.get('/auth/2fa')).data.data,
   twoFactorSetup: async (): Promise<TwoFactorSetup> => (await api.post('/auth/2fa/setup')).data.data,
   twoFactorEnable: async (token: string): Promise<{ backupCodes: string[] }> =>

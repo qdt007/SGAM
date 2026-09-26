@@ -53,11 +53,19 @@ function redirectToClient(res: Response, params: Record<string, string>): void {
   res.redirect(`${frontendOrigin()}/auth/google#${new URLSearchParams(params)}`);
 }
 
+/**
+ * Hands back the Google URL instead of redirecting to it.
+ *
+ * Redirecting from here meant a no-reputation *.onrender.com address sent the browser straight
+ * to a Google sign-in page, which is precisely the shape of a phishing site — Chrome Safe
+ * Browsing flagged this route as dangerous. Letting the frontend navigate means the jump to
+ * Google starts from the app's own origin, which is the ordinary OAuth pattern.
+ */
 export const googleStart = asyncHandler(async (_req: Request, res: Response) => {
   if (!authService.googleConfigured()) {
     throw Object.assign(new Error('Google sign-in is not configured on this server'), { status: 503 });
   }
-  res.redirect(authService.googleAuthUrl(signOAuthState()));
+  success(res, { url: authService.googleAuthUrl(signOAuthState()) });
 });
 
 export const googleCallback = asyncHandler(async (req: Request, res: Response) => {
