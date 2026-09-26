@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { DayPicker } from 'react-day-picker';
 import { format, isValid } from 'date-fns';
 import { Calendar, X, Clock } from 'lucide-react';
@@ -34,9 +35,10 @@ export function DatePicker({
   showTime = true,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
-  const [dropUp, setDropUp] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
 
   const selected = value ? new Date(value) : undefined;
   const isValidDate = selected && isValid(selected);
@@ -53,17 +55,52 @@ export function DatePicker({
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      // The popup lives in a portal, so it is not inside `ref` — both have to be checked or
+      // the first click on the calendar would close it.
+      if (ref.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
+  /**
+   * The popup is ~480px wide, wider than the dialogs it is often opened inside, so positioning
+   * it relative to the field meant the modal clipped the time drums off. It is rendered into
+   * document.body instead and placed against the viewport, flipping up or shifting left when
+   * there is not room.
+   */
+  const place = useCallback(() => {
+    const trigger = btnRef.current;
+    const pop = popRef.current;
+    if (!trigger || !pop) return;
+
+    const t = trigger.getBoundingClientRect();
+    const w = pop.offsetWidth || 480;
+    const h = pop.offsetHeight || 520;
+    const M = 8;
+
+    const below = window.innerHeight - t.bottom;
+    const up = below < h + M && t.top > below;
+
+    setPos({
+      top: up ? Math.max(M, t.top - h - 6) : Math.min(t.bottom + 6, window.innerHeight - h - M),
+      left: Math.max(M, Math.min(t.left, window.innerWidth - w - M)),
+    });
+  }, []);
+
   useLayoutEffect(() => {
-    if (!open || !btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    setDropUp(window.innerHeight - rect.bottom < 520 && rect.top > window.innerHeight - rect.bottom);
-  }, [open]);
+    if (!open) return;
+    place();
+    // Anything that moves the field underneath has to move the popup with it.
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, place]);
 
   const buildDate = (day: Date, h: number, m: number) => {
     const d = new Date(day);
@@ -148,15 +185,18 @@ export function DatePicker({
         )}
       </button>
 
-      {/* Popup */}
-      <div
-        className={cn(
-          'absolute z-[200] rounded-xl border border-black/[0.06] bg-raised shadow-modal overflow-hidden w-max',
-          'transition-all duration-200',
-          dropUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-1.5 origin-top-left',
-          open ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none',
-        )}
-      >
+      {/* Popup — portalled so a narrow dialog cannot clip the time drums */}
+      {open &&
+        createPortal(
+          <div
+            ref={popRef}
+            style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999 }}
+            className={cn(
+              'fixed z-[200] w-max overflow-hidden rounded-xl border border-black/[0.06] bg-raised shadow-modal',
+              'transition-opacity duration-150',
+              pos ? 'opacity-100' : 'opacity-0',
+            )}
+          >
         {/* Apple-style calendar theme */}
         <style>{`
  .rdp { --rdp-cell-size:38px; --rdp-accent-color:#C2410C; --rdp-background-color:#FFEDD5; margin:0; }
@@ -239,8 +279,10 @@ export function DatePicker({
           <button type="button" onClick={() => setOpen(false)} className="btn-primary text-xs !py-1.5 !px-5">
             Done
           </button>
-        </div>
-      </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

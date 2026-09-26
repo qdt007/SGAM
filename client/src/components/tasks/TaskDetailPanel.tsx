@@ -11,6 +11,8 @@ import { FileAttachments } from '../files/FileAttachments';
 import { TaskTimer } from '../timeTracking/TaskTimer';
 import { TaskDependencies } from './TaskDependencies';
 import { TaskTags } from './TaskTags';
+import { SelectField, SelectOption } from '../ui/SelectField';
+import { projectsApi } from '../../api/projectsApi';
 import { STATUS_COLOR } from '../../constants/taskStyles';
 import { ConfirmDialog } from '../ui/Modal';
 
@@ -37,6 +39,31 @@ export function TaskDetailPanel({
   const queryClient = useQueryClient();
   const { canEdit } = usePermissions(projectId);
   const [showDelete, setShowDelete] = useState(false);
+
+  // Only project members can be assigned; the API rejects anyone else.
+  const { data: members = [], isLoading: membersLoading } = useQuery({
+    queryKey: keys.projects.members(projectId),
+    queryFn: () => projectsApi.getMembers(projectId),
+    enabled: !!projectId,
+  });
+
+  const assigneeOptions: SelectOption[] = [
+    { value: '', label: 'Unassigned', iconifyIcon: 'ph:user-circle-dashed', iconColor: 'text-ink-subtle' },
+    ...members.map((m) => ({
+      value: m.userId,
+      label: m.user?.displayName ?? m.user?.username ?? 'Unknown',
+      iconifyIcon: 'ph:user-circle-duotone',
+    })),
+  ];
+
+  /** Reassigning from here saves immediately — there is no form around it to submit. */
+  const { mutate: reassign } = useMutation({
+    mutationFn: (assigneeId: string | null) => tasksApi.update(taskId, { assigneeId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.tasks.detail(taskId) });
+      queryClient.invalidateQueries({ queryKey: keys.tasks.byProject(projectId) });
+    },
+  });
 
   // Closing the panel is part of deleting: the task it was showing no longer exists.
   const deleteTask = useMutation({
@@ -160,7 +187,20 @@ export function TaskDetailPanel({
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <dt className="text-xs text-ink-muted">Assignee</dt>
-                  <dd className="text-ink">{task.assignee?.displayName ?? 'Unassigned'}</dd>
+                  <dd className="text-ink">
+                    {canEdit ? (
+                      <SelectField
+                        size="sm"
+                        value={task.assigneeId ?? ''}
+                        onChange={(v) => reassign(v || null)}
+                        options={assigneeOptions}
+                        placeholder={membersLoading ? 'Loading…' : 'Unassigned'}
+                        className="-ml-2"
+                      />
+                    ) : (
+                      task.assignee?.displayName ?? 'Unassigned'
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-ink-muted">Created by</dt>
