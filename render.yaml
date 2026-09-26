@@ -44,6 +44,23 @@ services:
         sync: false
       - key: CLOUDINARY_FOLDER
         value: pm-uploads
+      # Google sign-in. Leave unset and the button returns 503; the rest of auth is unaffected.
+      # GOOGLE_CALLBACK_URL must match the Authorized redirect URI in the Google console exactly.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        value: https://pm-api-zdtj.onrender.com/api/auth/google/callback
+      # VNPay. Unset means checkout stays simulated; the rest of billing works either way.
+      # The IPN URL is set in VNPay's portal, not here:
+      #   https://pm-api-zdtj.onrender.com/api/billing/vnpay/ipn
+      - key: VNPAY_TMN_CODE
+        sync: false
+      - key: VNPAY_HASH_SECRET
+        sync: false
+      - key: VNPAY_RETURN_URL
+        value: https://pm-api-zdtj.onrender.com/api/billing/vnpay/return
       # Optional — leave unset and the queues write/send directly, which is fine at this scale.
       - key: SMTP_HOST
         sync: false
