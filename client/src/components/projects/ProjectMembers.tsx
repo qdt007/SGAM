@@ -9,8 +9,16 @@ import { keys } from '../../constants/queryKeys';
 import { ProjectRole } from '../../types';
 import { cn } from '../../utils/cn';
 import { Avatar } from '../ui/Avatar';
+import { SelectField, SelectOption } from '../ui/SelectField';
+import { ConfirmDialog } from '../ui/Modal';
 
-const ROLES: ProjectRole[] = ['OWNER', 'MANAGER', 'MEMBER', 'VIEWER'];
+const ROLE_OPTIONS: SelectOption[] = [
+  { value: 'OWNER', label: 'Owner', iconifyIcon: 'ph:crown-duotone', iconColor: 'text-primary' },
+  { value: 'MANAGER', label: 'Manager', iconifyIcon: 'ph:shield-check-duotone', iconColor: 'text-violet-500' },
+  { value: 'MEMBER', label: 'Member', iconifyIcon: 'ph:user-duotone', iconColor: 'text-emerald-500' },
+  { value: 'VIEWER', label: 'Viewer', iconifyIcon: 'ph:eye-duotone', iconColor: 'text-ink-muted' },
+];
+const INVITE_ROLE_OPTIONS = ROLE_OPTIONS.filter((o) => o.value !== 'OWNER');
 
 const ROLE_STYLE: Record<ProjectRole, string> = {
   OWNER: 'bg-primary/10 text-primary',
@@ -26,6 +34,7 @@ export function ProjectMembers({ projectId }: { projectId: string }) {
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<ProjectRole>('MEMBER');
   const [error, setError] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<{ userId: string; name: string } | null>(null);
 
   const { data: members = [] } = useQuery({
     queryKey: keys.projects.members(projectId),
@@ -100,25 +109,21 @@ export function ProjectMembers({ projectId }: { projectId: string }) {
             </div>
 
             {canManageMembers && m.userId !== user?.id ? (
-              <select
+              <SelectField
+                size="sm"
                 value={m.role}
-                onChange={(e) => changeRole({ userId: m.userId, newRole: e.target.value as ProjectRole })}
-                className="text-xs rounded-full border border-hairline bg-raised px-2 py-1 text-ink-muted"
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => changeRole({ userId: m.userId, newRole: v as ProjectRole })}
+                options={ROLE_OPTIONS}
+                className="w-32 shrink-0"
+              />
             ) : (
               <span className={cn('badge text-xs', ROLE_STYLE[m.role])}>{m.role}</span>
             )}
 
             {canManageMembers && m.userId !== user?.id && (
               <button
-                onClick={() => removeMember(m.userId)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted hover:text-red-500 shrink-0"
+                onClick={() => setPendingRemoval({ userId: m.userId, name: m.user?.displayName ?? 'this member' })}
+                className="row-action text-ink-muted hover:text-red-500"
                 aria-label={'Remove ' + (m.user?.displayName ?? 'member')}
               >
                 <Icon icon="ph:user-minus" width={16} />
@@ -137,17 +142,12 @@ export function ProjectMembers({ projectId }: { projectId: string }) {
               placeholder="Search people by name, @username or email"
               className="input text-sm py-2"
             />
-            <select
+            <SelectField
               value={role}
-              onChange={(e) => setRole(e.target.value as ProjectRole)}
-              className="input text-sm py-2 w-32 shrink-0"
-            >
-              {ROLES.filter((r) => r !== 'OWNER').map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setRole(v as ProjectRole)}
+              options={INVITE_ROLE_OPTIONS}
+              className="w-32 shrink-0"
+            />
           </div>
 
           {error && <p className="text-xs text-red-500">{error}</p>}
@@ -177,6 +177,19 @@ export function ProjectMembers({ projectId }: { projectId: string }) {
             </div>
           )}
         </div>
+      )}
+
+      {pendingRemoval && (
+        <ConfirmDialog
+          title={`Remove ${pendingRemoval.name}?`}
+          message="They lose access to this project immediately. Their tasks, comments and time logs stay, and you can add them back later."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            removeMember(pendingRemoval.userId);
+            setPendingRemoval(null);
+          }}
+          onClose={() => setPendingRemoval(null)}
+        />
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -6,6 +7,8 @@ import { format } from 'date-fns';
 import { tasksApi } from '../../api/tasksApi';
 import { Task } from '../../types';
 import { cn } from '../../utils/cn';
+import { ConfirmDialog } from '../ui/Modal';
+import { Avatar } from '../ui/Avatar';
 import { PRIORITY_DOT } from './kanbanColumns';
 
 interface TaskCardProps {
@@ -19,6 +22,8 @@ export function TaskCard({ task, projectId, isDragging, onOpen }: TaskCardProps)
   const qc = useQueryClient();
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: task.id });
 
+  const [showDelete, setShowDelete] = useState(false);
+
   const deleteMutation = useMutation({
     mutationFn: () => tasksApi.delete(task.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
@@ -27,6 +32,7 @@ export function TaskCard({ task, projectId, isDragging, onOpen }: TaskCardProps)
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
 
   return (
+    <>
     <div
       ref={setNodeRef}
       style={style}
@@ -57,8 +63,11 @@ export function TaskCard({ task, projectId, isDragging, onOpen }: TaskCardProps)
         </button>
 
         <button
-          onClick={() => deleteMutation.mutate()}
-          className="opacity-0 group-hover:opacity-100 text-ink-subtle/70 hover:text-red-500 transition-colors shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDelete(true);
+          }}
+          className="row-action text-ink-subtle/70 hover:text-red-500"
         >
           <X size={12} />
         </button>
@@ -94,16 +103,24 @@ export function TaskCard({ task, projectId, isDragging, onOpen }: TaskCardProps)
             </span>
           )}
           {task.assignee && (
-            <div
-              className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-white text-xs shrink-0"
-              title={task.assignee.displayName}
-            >
-              {task.assignee.displayName?.[0]}
-            </div>
+            <span title={task.assignee.displayName}>
+              <Avatar name={task.assignee.displayName} src={task.assignee.avatarUrl} size="xs" />
+            </span>
           )}
         </div>
       </div>
     </div>
+    {showDelete && (
+      <ConfirmDialog
+        title={`Delete "${task.title}"?`}
+        message="Its comments, attachments, time logs and subtasks go with it. This cannot be undone."
+        confirmLabel="Delete task"
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate(undefined, { onSuccess: () => setShowDelete(false) })}
+        onClose={() => setShowDelete(false)}
+      />
+    )}
+    </>
   );
 }
 

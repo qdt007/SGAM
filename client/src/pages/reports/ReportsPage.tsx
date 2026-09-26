@@ -138,6 +138,7 @@ export function ReportsPage() {
             { label: 'Projects', to: '/projects' },
             { label: project?.name ?? 'Project', to: `/projects/${projectId}` },
           ]}
+          backTo={`/projects/${projectId}`}
           title="Reports"
         />
         <div className="card-flush">
@@ -158,6 +159,7 @@ export function ReportsPage() {
           { label: 'Projects', to: '/projects' },
           { label: project?.name ?? 'Project', to: `/projects/${projectId}` },
         ]}
+        backTo={`/projects/${projectId}`}
         title="Reports"
         description="Progress, burndown and per-member workload for this project."
       />

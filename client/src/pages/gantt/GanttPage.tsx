@@ -22,6 +22,7 @@ import {
   startOfWeek,
   isSameWeek,
 } from 'date-fns';
+import { BackButton } from '../../components/ui/BackButton';
 
 /* ─── Config ─────────────────────────────── */
 const DAY_W = 36;
@@ -193,7 +194,8 @@ export function GanttPage() {
   if (!canUseGantt) {
     return (
       <div className="flex h-full flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center border-b border-line bg-surface px-4 py-3 sm:px-6">
+        <header className="flex shrink-0 items-center gap-x-3 border-b border-line bg-surface px-4 py-3 sm:px-6">
+          <BackButton to={`/projects/${projectId}`} />
           <div className="min-w-0">
             <Breadcrumbs
               items={[
@@ -218,6 +220,7 @@ export function GanttPage() {
   return (
     <div className="flex flex-col h-full bg-sunken bg-page overflow-hidden">
       <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-3 sm:px-6">
+        <BackButton to={`/projects/${projectId}`} />
         <div className="min-w-0">
           <Breadcrumbs
             items={[

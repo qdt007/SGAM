@@ -53,7 +53,7 @@ function ProjectCard({ project }: { project: Project }) {
             onClick={() => setMenuOpen((o) => !o)}
             aria-label={`Actions for ${project.name}`}
             aria-haspopup="menu"
-            className="btn-ghost btn-icon-sm opacity-0 transition-opacity duration-150 focus-visible:opacity-100 group-hover:opacity-100"
+            className="btn-ghost btn-icon-sm row-action"
           >
             <Icon icon="ph:dots-three-bold" width={16} aria-hidden />
           </button>

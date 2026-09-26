@@ -5,6 +5,7 @@ import { tasksApi } from '../../api/tasksApi';
 import { keys } from '../../constants/queryKeys';
 import { Task } from '../../types';
 import { cn } from '../../utils/cn';
+import { SelectField } from '../ui/SelectField';
 
 export function TaskDependencies({
   taskId,
@@ -75,7 +76,7 @@ export function TaskDependencies({
       {canEdit && (
         <button
           onClick={() => remove(depId)}
-          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted hover:text-red-500 shrink-0"
+          className="ml-auto row-action text-ink-muted hover:text-red-500"
           aria-label="Remove dependency"
         >
           <Icon icon="ph:x" width={13} />
@@ -112,16 +113,12 @@ export function TaskDependencies({
 
       {adding && (
         <div className="space-y-1.5">
-          <select className="input text-sm" defaultValue="" onChange={(e) => e.target.value && add(e.target.value)}>
-            <option value="" disabled>
-              Select the task that blocks this one…
-            </option>
-            {candidates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            value=""
+            placeholder="Select the task that blocks this one…"
+            onChange={(v) => v && add(v)}
+            options={candidates.map((t) => ({ value: t.id, label: t.title }))}
+          />
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button
             onClick={() => {

@@ -12,6 +12,7 @@ import { TaskTimer } from '../timeTracking/TaskTimer';
 import { TaskDependencies } from './TaskDependencies';
 import { TaskTags } from './TaskTags';
 import { STATUS_COLOR } from '../../constants/taskStyles';
+import { ConfirmDialog } from '../ui/Modal';
 
 const TABS = [
   { id: 'details', label: 'Details', icon: 'ph:list-bullets-duotone' },
@@ -35,6 +36,17 @@ export function TaskDetailPanel({
   const [newSubtask, setNewSubtask] = useState('');
   const queryClient = useQueryClient();
   const { canEdit } = usePermissions(projectId);
+  const [showDelete, setShowDelete] = useState(false);
+
+  // Closing the panel is part of deleting: the task it was showing no longer exists.
+  const deleteTask = useMutation({
+    mutationFn: () => tasksApi.delete(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.tasks.byProject(projectId) });
+      setShowDelete(false);
+      onClose();
+    },
+  });
 
   const { data: task, isLoading } = useQuery({
     queryKey: keys.tasks.detail(taskId),
@@ -101,9 +113,21 @@ export function TaskDetailPanel({
                 </div>
               )}
             </div>
-            <button onClick={onClose} className="btn-ghost p-2 shrink-0" aria-label="Close panel">
-              <Icon icon="ph:x" width={18} />
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              {canEdit && (
+                <button
+                  onClick={() => setShowDelete(true)}
+                  className="btn-quiet-danger p-2"
+                  aria-label="Delete task"
+                  title="Delete task"
+                >
+                  <Icon icon="ph:trash" width={18} />
+                </button>
+              )}
+              <button onClick={onClose} className="btn-ghost p-2" aria-label="Close panel">
+                <Icon icon="ph:x" width={18} />
+              </button>
+            </div>
           </div>
 
           <nav className="mt-4 flex gap-1">
@@ -220,6 +244,17 @@ export function TaskDetailPanel({
           {tab === 'time' && <TaskTimer taskId={taskId} taskTitle={task?.title ?? ''} />}
         </div>
       </aside>
+
+      {showDelete && (
+        <ConfirmDialog
+          title={`Delete "${task?.title ?? 'this task'}"?`}
+          message="Its comments, attachments, time logs and subtasks go with it. This cannot be undone."
+          confirmLabel="Delete task"
+          loading={deleteTask.isPending}
+          onConfirm={() => deleteTask.mutate()}
+          onClose={() => setShowDelete(false)}
+        />
+      )}
     </div>
   );
 }

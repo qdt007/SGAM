@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../api/projectsApi';
 import { usePermissions } from '../../hooks/usePermissions';
 import { keys } from '../../constants/queryKeys';
+import { ConfirmDialog } from '../ui/Modal';
 
 const SWATCHES = ['#6366f1', '#0066cc', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#0891b2', '#78716c'];
 
@@ -18,6 +19,7 @@ export function ProjectTags({ projectId }: { projectId: string }) {
   const [name, setName] = useState('');
   const [color, setColor] = useState(SWATCHES[0]);
   const [error, setError] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const { data: tags = [] } = useQuery({
     queryKey: keys.projects.tags(projectId),
@@ -72,9 +74,9 @@ export function ProjectTags({ projectId }: { projectId: string }) {
               {t.name}
               {isOwner && (
                 <button
-                  onClick={() => remove.mutate(t.id)}
+                  onClick={() => setPendingDelete({ id: t.id, name: t.name })}
                   aria-label={`Remove tag ${t.name}`}
-                  className="opacity-0 transition-opacity group-hover:opacity-100"
+                  className="row-action"
                 >
                   <Icon icon="ph:x-bold" width={10} aria-hidden />
                 </button>
@@ -128,6 +130,19 @@ export function ProjectTags({ projectId }: { projectId: string }) {
             + Add tag
           </button>
         ))}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`Remove the "${pendingDelete.name}" tag?`}
+          message="It is taken off every task in this project. Other projects using the same tag keep it."
+          confirmLabel="Remove tag"
+          onConfirm={() => {
+            remove.mutate(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

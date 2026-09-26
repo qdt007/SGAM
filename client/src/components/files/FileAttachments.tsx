@@ -7,6 +7,7 @@ import { formatFileSize, isImage, getExtension } from '../../utils/fileUtils';
 import { formatRelative } from '../../utils/dateUtils';
 import { keys } from '../../constants/queryKeys';
 import { cn } from '../../utils/cn';
+import { ConfirmDialog } from '../ui/Modal';
 
 const MAX_MB = 10;
 
@@ -17,6 +18,7 @@ export function FileAttachments({ taskId, canUpload = true }: { taskId: string; 
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const { data: files = [] } = useQuery({
     queryKey: keys.tasks.files(taskId),
@@ -138,8 +140,8 @@ export function FileAttachments({ taskId, canUpload = true }: { taskId: string; 
               </div>
               {f.uploaderId === user?.id && (
                 <button
-                  onClick={() => remove(f.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted hover:text-red-500 shrink-0"
+                  onClick={() => setPendingDelete({ id: f.id, name: f.originalName })}
+                  className="row-action text-ink-muted hover:text-red-500"
                   aria-label="Delete file"
                 >
                   <Icon icon="ph:trash" width={15} />
@@ -148,6 +150,19 @@ export function FileAttachments({ taskId, canUpload = true }: { taskId: string; 
             </div>
           ))}
         </div>
+      )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`Delete ${pendingDelete.name}?`}
+          message="The file is removed from storage as well, so the link stops working for everyone."
+          confirmLabel="Delete file"
+          onConfirm={() => {
+            remove(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onClose={() => setPendingDelete(null)}
+        />
       )}
     </div>
   );

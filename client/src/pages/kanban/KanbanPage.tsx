@@ -24,6 +24,7 @@ import { KanbanColumn } from '../../components/kanban/KanbanColumn';
 import { TaskCard, DragOverlayCard } from '../../components/kanban/TaskCard';
 import { Task } from '../../types';
 import { cn } from '../../utils/cn';
+import { BackButton } from '../../components/ui/BackButton';
 
 export function KanbanPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -100,6 +101,7 @@ export function KanbanPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface px-4 py-3 sm:px-6">
+        <BackButton to={`/projects/${projectId}`} />
         <div className="min-w-0">
           <Breadcrumbs
             items={[

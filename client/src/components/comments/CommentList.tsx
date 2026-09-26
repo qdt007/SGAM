@@ -10,6 +10,7 @@ import { Comment } from '../../types';
 import { cn } from '../../utils/cn';
 import { CommentEditor } from './CommentEditor';
 import { Avatar } from '../ui/Avatar';
+import { ConfirmDialog } from '../ui/Modal';
 
 /** Renders @handles as highlighted chips without dangerouslySetInnerHTML. */
 function CommentBody({ body }: { body: string }) {
@@ -33,6 +34,7 @@ export function CommentList({ taskId, canComment = true }: { taskId: string; can
   const { user } = useAuthStore();
   const { on, off } = useSocket();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const { data: comments = [], isLoading } = useQuery({
     queryKey: keys.tasks.comments(taskId),
@@ -99,7 +101,7 @@ export function CommentList({ taskId, canComment = true }: { taskId: string; can
                     <span className="text-xs text-ink-muted">{formatRelative(c.createdAt)}</span>
                     {c.editedAt && <span className="text-xs text-ink-muted italic">edited</span>}
                     {isMine && editingId !== c.id && (
-                      <span className="ml-auto flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="ml-auto flex gap-1 row-action">
                         <button
                           onClick={() => setEditingId(c.id)}
                           className="text-ink-muted hover:text-primary"
@@ -108,7 +110,7 @@ export function CommentList({ taskId, canComment = true }: { taskId: string; can
                           <Icon icon="ph:pencil-simple" width={14} />
                         </button>
                         <button
-                          onClick={() => remove(c.id)}
+                          onClick={() => setPendingDelete(c.id)}
                           className="text-ink-muted hover:text-red-500"
                           aria-label="Delete comment"
                         >
@@ -157,6 +159,19 @@ export function CommentList({ taskId, canComment = true }: { taskId: string; can
       )}
 
       {canComment && <CommentEditor onSubmit={(body) => create(body)} isPending={isCreating} />}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete this comment?"
+          message="It disappears for everyone on the task, along with any mentions it created."
+          confirmLabel="Delete"
+          onConfirm={() => {
+            remove(pendingDelete);
+            setPendingDelete(null);
+          }}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

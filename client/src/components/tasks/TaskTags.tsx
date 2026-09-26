@@ -70,7 +70,7 @@ export function TaskTags({
                 onClick={() => toggle(t.tagId)}
                 disabled={isPending}
                 aria-label={`Remove ${t.tag.name} from this task`}
-                className="opacity-0 transition-opacity group-hover:opacity-100"
+                className="row-action"
               >
                 <Icon icon="ph:x-bold" width={10} aria-hidden />
               </button>

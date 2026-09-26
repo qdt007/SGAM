@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { cn } from '../../utils/cn';
+import { BackButton } from './BackButton';
 
 /**
  * One container for every routed screen: same max width, same gutters, same
@@ -65,6 +66,7 @@ export function PageHeader({
   title,
   description,
   breadcrumbs,
+  backTo,
   actions,
   meta,
   className,
@@ -72,6 +74,8 @@ export function PageHeader({
   title: React.ReactNode;
   description?: React.ReactNode;
   breadcrumbs?: Crumb[];
+  /** Shows a back control that prefers history and falls back to this route. */
+  backTo?: string;
   actions?: React.ReactNode;
   meta?: React.ReactNode;
   className?: string;
@@ -80,10 +84,13 @@ export function PageHeader({
     <header className={cn('mb-6', className)}>
       {breadcrumbs && <Breadcrumbs items={breadcrumbs} className="mb-2" />}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-start gap-2">
+          {backTo && <BackButton to={backTo} className="mt-0.5" />}
+          <div className="min-w-0">
           <h1 className="truncate text-2xl font-semibold text-ink">{title}</h1>
           {description && <p className="mt-1 text-md text-ink-muted">{description}</p>}
           {meta && <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">{meta}</div>}
+          </div>
         </div>
         {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
       </div>

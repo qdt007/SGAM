@@ -8,6 +8,7 @@ import { dueDateLabel, isOverdue } from '../../utils/dateUtils';
 import { STATUS_LABEL, STATUS_BADGE, PRIORITY_DOT, PRIORITY_LABEL } from '../../constants/taskStyles';
 import { EditTaskModal } from './EditTaskModal';
 import { Avatar } from '../ui/Avatar';
+import { ConfirmDialog } from '../ui/Modal';
 
 export function TaskRow({
   task,
@@ -20,6 +21,7 @@ export function TaskRow({
 }) {
   const qc = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const isDone = task.status === 'DONE';
   const late = !isDone && task.status !== 'CANCELLED' && isOverdue(task.dueDate);
 
@@ -113,12 +115,12 @@ export function TaskRow({
           </span>
         )}
 
-        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
+        <span className="flex shrink-0 items-center gap-0.5 row-action">
           <button onClick={() => setShowEdit(true)} className="btn-ghost btn-icon-sm" aria-label={`Edit ${task.title}`}>
             <Icon icon="ph:pencil-simple" width={15} aria-hidden />
           </button>
           <button
-            onClick={() => deleteTask.mutate()}
+            onClick={() => setShowDelete(true)}
             disabled={deleteTask.isPending}
             className="btn-quiet-danger btn-icon-sm"
             aria-label={`Delete ${task.title}`}
@@ -129,6 +131,16 @@ export function TaskRow({
       </div>
 
       {showEdit && <EditTaskModal task={task} projectId={projectId} onClose={() => setShowEdit(false)} />}
+      {showDelete && (
+        <ConfirmDialog
+          title={`Delete "${task.title}"?`}
+          message="Its comments, attachments, time logs and subtasks go with it. This cannot be undone."
+          confirmLabel="Delete task"
+          loading={deleteTask.isPending}
+          onConfirm={() => deleteTask.mutate(undefined, { onSuccess: () => setShowDelete(false) })}
+          onClose={() => setShowDelete(false)}
+        />
+      )}
     </>
   );
 }

@@ -111,6 +111,7 @@ export function ProjectDetailPage() {
     <Page>
       <PageHeader
         breadcrumbs={[{ label: 'Projects', to: '/projects' }]}
+        backTo="/projects"
         title={
           <span className="flex min-w-0 items-center gap-2.5">
             <span

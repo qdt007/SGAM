@@ -7,6 +7,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { durationFromMinutes, formatRelative } from '../../utils/dateUtils';
 import { keys } from '../../constants/queryKeys';
 import { cn } from '../../utils/cn';
+import { ConfirmDialog } from '../ui/Modal';
 
 /** Start/stop control plus this task's time log history. */
 export function TaskTimer({
@@ -37,6 +38,7 @@ export function TaskTimer({
   const [manualHours, setManualHours] = useState('1');
   const [manualNote, setManualNote] = useState('');
   const [manualError, setManualError] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const { mutate: logManual, isPending: loggingManual } = useMutation({
     mutationFn: () => {
@@ -184,8 +186,8 @@ export function TaskTimer({
               {l.note && <span className="text-ink-muted truncate italic">— {l.note}</span>}
               {l.userId === user?.id && l.endedAt && (
                 <button
-                  onClick={() => removeLog(l.id)}
-                  className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted hover:text-red-500"
+                  onClick={() => setPendingDelete(l.id)}
+                  className="ml-auto row-action text-ink-muted hover:text-red-500"
                   aria-label="Delete time log"
                 >
                   <Icon icon="ph:trash" width={13} />
@@ -194,6 +196,19 @@ export function TaskTimer({
             </div>
           ))}
         </div>
+      )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete this time log?"
+          message="The hours come off this task and off the workload report."
+          confirmLabel="Delete entry"
+          onConfirm={() => {
+            removeLog(pendingDelete);
+            setPendingDelete(null);
+          }}
+          onClose={() => setPendingDelete(null)}
+        />
       )}
     </div>
   );

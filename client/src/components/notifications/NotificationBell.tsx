@@ -8,6 +8,7 @@ import { formatRelative } from '../../utils/dateUtils';
 import { keys } from '../../constants/queryKeys';
 import { NotificationType } from '../../types';
 import { cn } from '../../utils/cn';
+import { ConfirmDialog } from '../ui/Modal';
 
 const TYPE_ICON: Record<NotificationType, { icon: string; color: string }> = {
   TASK_ASSIGNED: { icon: 'ph:user-focus-duotone', color: 'text-primary' },
@@ -25,6 +26,7 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAllNotifications } = useNotifications();
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -76,7 +78,7 @@ export function NotificationBell() {
               )}
               {notifications.length > 0 && (
                 <button
-                  onClick={() => clearAllNotifications()}
+                  onClick={() => setConfirmClear(true)}
                   className="text-xs text-ink-muted hover:underline"
                 >
                   Clear all
@@ -112,7 +114,7 @@ export function NotificationBell() {
                     </div>
                     <button
                       onClick={(e) => handleDelete(e, n.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted hover:text-red-500 shrink-0"
+                      className="row-action text-ink-muted hover:text-red-500"
                       aria-label="Delete notification"
                     >
                       <Icon icon="ph:x" width={14} />
@@ -123,6 +125,20 @@ export function NotificationBell() {
             )}
           </div>
         </div>
+      )}
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="Clear all notifications?"
+          message="Every notification is deleted, read or not. The tasks and comments they point at are untouched."
+          confirmLabel="Clear all"
+          onConfirm={() => {
+            clearAllNotifications();
+            setConfirmClear(false);
+            setOpen(false);
+          }}
+          onClose={() => setConfirmClear(false)}
+        />
       )}
     </div>
   );
