@@ -67,6 +67,27 @@ Things worth knowing before you change them:
 - **A user may only have one timer running at a time.** `timeTracking.service.startTimer` closes the previous one and emits `TIMER_CONFLICT` rather than letting two run.
 - **@handles only become mentions for members of that project**, checked in `comments.service.create`.
 - **Reports count top-level tasks only** (`parentId: null`), so the numbers match what the list, board and gantt show. Subtasks are checklist items inside a task, not scope of their own — time logged on them still counts.
+- **Payments are real when VNPay is configured, simulated when it is not.** `VNPAY_TMN_CODE` +
+  `VNPAY_HASH_SECRET` switch `billing.service.checkout` from returning a mock reference to
+  returning a `paymentUrl`. Both paths end in `activatePro()`, so a real payment and a simulated
+  one leave the subscription in the same state.
+- **Only the IPN grants Pro.** `GET /api/billing/vnpay/ipn` is the authoritative callback and is
+  unauthenticated by necessity — VNPay has no session — so nothing is trusted before the HMAC
+  over the query string verifies. The browser return URL only reports; it never grants.
+- **`config/vnpay.ts` reproduces VNPay's signing byte for byte.** It is not "URL-encode the
+  query": keys are encoded then sorted, values encoded with `%20` rewritten to `+`, joined
+  without re-encoding. `URLSearchParams` escapes `!'()*` differently and every difference comes
+  back as "Sai chữ ký".
+- **A password is not always present.** `User.passwordHash` is nullable because a Google-created
+  account never had one. Password login, password change and 2FA-disable all say so by name
+  rather than failing with "invalid credentials".
+- **Two tokens share the access secret**, so `verifyAccessToken` rejects anything carrying a
+  `purpose` claim. Without that a 2FA challenge — handed out *before* the second factor — would
+  authenticate as a session. Same for the OAuth `state`.
+- **Google linking trusts `email_verified`.** Linking an existing account by email without that
+  check lets anyone register an unverified Google account on someone else's address and take over.
+- **The OAuth callback returns tokens in the URL fragment**, not the query string: fragments are
+  never sent to a server, so they stay out of logs. `GoogleCallbackPage` wipes it on arrival.
 - **Avatars are uploads, not URLs.** `POST/DELETE /api/users/me/avatar` store the image through
   `config/storage.ts` and keep its key in `User.avatarKey` so the previous blob is deleted on
   replace. `updateMe` clears `avatarKey` when `avatarUrl` is set to an external link, or the key

@@ -144,9 +144,48 @@ Rà soát bằng cách đối chiếu endpoint backend với nơi gọi ở clie
 
 ---
 
+## Phase 6 — Trau chuốt + bảo mật đăng nhập (2026-09-25)
+
+### UI
+- ✅ **Nút quay lại** — `ui/BackButton`, ưu tiên lùi history, không có history thì về route cha (mở từ link/bookmark/thông báo thì `navigate(-1)` sẽ văng khỏi app). Gắn ở Kanban, Gantt, Reports, Project detail qua prop `backTo` của `PageHeader`.
+- ✅ **Hỏi lại trước khi xoá** — trước chỉ project mới hỏi. Giờ 10 chỗ: task (list + board + panel), comment, file, time log, tag, thành viên, avatar, xoá sạch thông báo. Gỡ liên kết dependency **cố ý không hỏi** — không mất dữ liệu, gắn lại hai click.
+- ✅ **Nút xoá task trong panel chi tiết** — trước phải ra ngoài list mới xoá được.
+- ✅ **Cắt ảnh đại diện** — `ui/ImageCropper` (`react-easy-crop`), kéo/zoom trong khung tròn, xuất PNG 512×512 qua canvas. Dùng PNG chứ không JPEG để ảnh có nền trong suốt không bị hộp trắng ở dark mode. Ảnh nguồn cho tới 10MB vì bản cắt ra chỉ ~90KB. Chunk Settings tăng 22KB → 57KB (17KB gzip), chỉ tải khi mở Settings.
+- ✅ **Bỏ hết `<select>` gốc** — 3 chỗ (vai trò thành viên ×2, chọn task phụ thuộc) chuyển sang `SelectField` để khớp thiết kế, kèm icon theo từng vai trò.
+
+### Bảo mật đăng nhập
+- ✅ **2FA TOTP** — `otplib` + QR. `POST /auth/2fa/setup|enable|disable`, `GET /auth/2fa`, `POST /auth/2fa/verify`. 8 mã dự phòng dùng một lần, lưu dạng bcrypt hash. Login thành 2 bước qua challenge token sống 5 phút.
+- ✅ **Đăng nhập Google** — luồng authorization code phía server, không thêm thư viện (dùng `fetch`). `state` ký bằng JWT chống CSRF. Gộp tài khoản theo email **chỉ khi** Google báo `email_verified`.
+
+### Lỗi bắt được khi làm
+- `login` cũ trả nguyên user object trừ `passwordHash` → thêm `twoFactorSecret` vào là **rò secret ra client**. Đã lọc qua `toSafeUser`.
+- `verifySync` của otplib **ném exception** thay vì trả `valid:false` khi mã không đủ 6 chữ số → mã dự phòng 10 ký tự làm crash. Đã chặn theo hình dạng mã trước khi gọi.
+- Challenge token ký bằng `JWT_ACCESS_SECRET` nên **dùng được làm access token** → `verifyAccessToken` giờ từ chối token có claim `purpose`.
+- **Refresh token chưa bao giờ được lưu.** `axiosClient` và `Layout` đều đọc `state.refreshToken` nhưng `setAuth` không nhận và `partialize` không lưu nó. Nghĩa là hết 15 phút access token là văng ra đăng nhập lại — refresh rotation chưa từng chạy. Thêm nữa server xoay refresh token mỗi lần refresh mà client chỉ lưu accessToken, nên lần thứ hai cũng hỏng. Đã sửa cả hai.
+
+---
+
+## Phase 7 — Thanh toán thật qua VNPay (2026-09-25)
+
+- ✅ **`config/vnpay.ts`** — dựng URL thanh toán và xác thực callback, bám đúng thuật toán ký của VNPay 2.1.0 (mã hoá key rồi sort theo key đã mã hoá, value mã hoá với `%20`→`+`, nối lại **không** mã hoá lần nữa). Dùng `URLSearchParams` sẽ ra chuỗi khác ở `!'()*` và VNPay trả "Sai chữ ký".
+- ✅ **`checkout` trả `paymentUrl`** khi có credential, không có thì giữ nguyên luồng mô phỏng — máy dev không cần tài khoản merchant vẫn chạy.
+- ✅ **IPN là nguồn sự thật duy nhất** — `GET /api/billing/vnpay/ipn`, public (VNPay gọi server-to-server, không có session). Trả đúng bộ mã VNPay: 97 sai chữ ký, 01 không thấy đơn, 04 sai số tiền, 02 đã xác nhận rồi, 00 thành công.
+- ✅ **Return URL chỉ để báo tin** — chuyển hướng về `/settings?tab=billing&payment=...`, không cấp quyền gì. Người dùng có thể tự gõ URL đó nên nó không được phép bật Pro.
+- ✅ **Chống cộng hạn hai lần** — gọi lại cùng một IPN trả 02, không cộng thêm chu kỳ.
+- ✅ **So khớp số tiền** — VNPay gửi số tiền ×100; lệch là từ chối 04.
+
+Test thật trên DB: 7 nhánh IPN đều đúng, gói lên PRO ACTIVE đúng hạn, gọi lại lần hai không cộng thêm, người dùng huỷ thì đơn thành FAILED.
+
+### Chưa làm
+- **Tiền thật** cần đăng ký doanh nghiệp với VNPay. Tài khoản cá nhân chỉ tới sandbox, nhưng luồng code y hệt — đổi credential là chạy thật.
+
+---
+
 ## Nợ kỹ thuật còn lại
 
 - [ ] Test mới phủ logic thuần và contract API; chưa có integration test chạm DB thật (cần DB riêng cho test)
 - [ ] Chưa có E2E (Playwright) cho luồng kéo thả Kanban và Gantt
+- [ ] Email confirmation khi đăng ký — chưa làm, cần SMTP thật (Render đang để trống hết biến SMTP)
+- [ ] Màn hình Google consent đang ở chế độ Testing: chỉ email nằm trong danh sách test users đăng nhập được
 - [ ] Cột Kanban tuỳ biến chưa nối UI (xem "Cố ý không làm" ở trên)
 - [ ] PostgreSQL cài tay, không có Windows service; phải khởi động qua scheduled task trong `start-all.bat`

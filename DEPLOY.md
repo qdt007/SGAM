@@ -217,6 +217,40 @@ the previous run's files out of Cloudinary.
 
 ---
 
+## VNPay (thanh toán)
+
+Checkout chỉ chạy thật khi `VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET` được đặt. Không có thì nó tự
+quay về chế độ mô phỏng, nên máy dev không cần tài khoản merchant.
+
+**Trên Render → Environment** đặt hai biến đó. `VNPAY_RETURN_URL` đã khai sẵn trong `render.yaml`.
+
+**Trong portal VNPay** (https://sandbox.vnpayment.vn/merchantv2/) khai IPN URL:
+
+```
+https://pm-api-zdtj.onrender.com/api/billing/vnpay/ipn
+```
+
+IPN là thứ duy nhất bật gói Pro. Return URL chỉ để báo tin cho người dùng, vì ai cũng gõ tay
+được URL đó.
+
+**Thẻ test sandbox:**
+
+| Trường | Giá trị |
+|---|---|
+| Ngân hàng | NCB |
+| Số thẻ | 9704198526191432198 |
+| Tên chủ thẻ | NGUYEN VAN A |
+| Ngày phát hành | 07/15 |
+| OTP | 123456 |
+
+**IPN không chạy được trên localhost** — VNPay phải gọi vào được từ internet. Test local chỉ đi
+tới bước sang trang VNPay rồi quay về; muốn thử trọn vòng phải deploy, hoặc mở `ngrok`.
+
+**Nếu VNPay trả trang "The terminal (website) not approved":** đó là trạng thái tài khoản bên
+VNPay, không phải lỗi code. Đăng nhập portal kiểm tra website đã được duyệt chưa.
+
+---
+
 ## Checklist
 
 - [ ] `https://<render-url>/health` returns `{"status":"ok"}`
