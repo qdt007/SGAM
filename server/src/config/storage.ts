@@ -18,32 +18,49 @@ const CLOUDINARY_FOLDER = process.env.CLOUDINARY_FOLDER || 'pm-uploads';
 if (STORAGE_TYPE === 'local') fsSync.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 /**
- * Which Cloudinary settings are missing. Asking for cloudinary storage without them fails deep
- * inside the SDK with "cloud_name is disabled", which surfaces to the user as a bare 500 — so
- * the gap is named here instead, loudly at boot and again in the error if an upload is tried.
+ * Whether Cloudinary is usable, decided by asking the SDK what it actually ended up holding
+ * rather than by guessing from environment variables.
+ *
+ * That matters because the settings can arrive two ways — the three CLOUDINARY_* variables or a
+ * single CLOUDINARY_URL — and passing `undefined` for a key would wipe out a value the URL had
+ * supplied. Only keys that are set are passed, and the answer comes from `cloudinary.config()`.
+ *
+ * Without this, a missing configuration failed inside the SDK with "cloud_name is disabled" and
+ * reached the browser as a bare "Internal server error".
  */
-const missingCloudinary: string[] =
-  STORAGE_TYPE === 'cloudinary' && !process.env.CLOUDINARY_URL
-    ? (['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'] as const).filter(
-        (k) => !process.env[k],
-      )
-    : [];
+function configureCloudinary(): string[] {
+  const provided: Record<string, string> = {};
+  if (process.env.CLOUDINARY_CLOUD_NAME) provided.cloud_name = process.env.CLOUDINARY_CLOUD_NAME;
+  if (process.env.CLOUDINARY_API_KEY) provided.api_key = process.env.CLOUDINARY_API_KEY;
+  if (process.env.CLOUDINARY_API_SECRET) provided.api_secret = process.env.CLOUDINARY_API_SECRET;
 
-if (STORAGE_TYPE === 'cloudinary') {
-  if (missingCloudinary.length) {
-    console.error(
-      `[Storage] STORAGE_TYPE=cloudinary but ${missingCloudinary.join(', ')} ${
-        missingCloudinary.length === 1 ? 'is' : 'are'
-      } not set. Uploads will be refused until they are.`,
-    );
-  }
-  // The SDK also reads CLOUDINARY_URL on its own; these three win when they are set.
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true,
-  });
+  cloudinary.config({ ...provided, secure: true });
+
+  const active = cloudinary.config();
+  return (
+    [
+      ['CLOUDINARY_CLOUD_NAME', active.cloud_name],
+      ['CLOUDINARY_API_KEY', active.api_key],
+      ['CLOUDINARY_API_SECRET', active.api_secret],
+    ] as const
+  )
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+}
+
+const missingCloudinary: string[] = STORAGE_TYPE === 'cloudinary' ? configureCloudinary() : [];
+
+if (missingCloudinary.length) {
+  console.error(
+    `[Storage] STORAGE_TYPE=cloudinary but ${missingCloudinary.join(', ')} ${
+      missingCloudinary.length === 1 ? 'is' : 'are'
+    } not set. Uploads will be refused until they are.`,
+  );
+}
+
+/** What /health reports, so a misconfigured deployment is visible without reading the logs. */
+export function storageStatus(): { type: StorageType; ready: boolean; missing: string[] } {
+  return { type: STORAGE_TYPE, ready: missingCloudinary.length === 0, missing: missingCloudinary };
 }
 
 /**

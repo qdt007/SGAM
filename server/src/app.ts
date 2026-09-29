@@ -18,6 +18,7 @@ import { taskCommentsRouter, commentsRouter } from './modules/comments/comments.
 import { taskTimeRouter, timeRouter } from './modules/timeTracking/timeTracking.routes';
 import { taskFilesRouter, projectFilesRouter, filesRouter } from './modules/files/files.routes';
 import { allowedOrigins } from './config/cors';
+import { storageStatus } from './config/storage';
 const app = express();
 // Render, Railway and friends terminate TLS in front of us. Without this express-rate-limit sees
 // the proxy's IP for every caller and buckets the whole internet together.
@@ -45,7 +46,11 @@ app.use('/api/tasks', tasksRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/time', timeRouter);
 app.use('/api/files', filesRouter);
-app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+// Reports file storage too: a deployment that cannot accept uploads should be visible here
+// rather than only when someone tries to change their profile picture.
+app.get('/health', (_req, res) =>
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), storage: storageStatus() }),
+);
 app.use((_req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 app.use(errorHandler);
 export default app;
