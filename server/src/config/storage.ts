@@ -105,7 +105,17 @@ async function saveCloudinary(file: UploadInput): Promise<StoredFile> {
         use_filename: false,
         unique_filename: false,
       },
-      (err, result) => (err || !result ? reject(err ?? new Error('Cloudinary upload failed')) : resolve(result)),
+      (err, result) => {
+        if (err || !result) {
+          // Cloudinary's own wording ("Invalid Signature", "Invalid api_key", a timeout) is what
+          // distinguishes a wrong credential from an unreachable network. It names no secret, so
+          // passing it through is safe and saves a trip to the server logs to find out which.
+          const detail = (err as { message?: string } | undefined)?.message ?? 'no response';
+          reject(Object.assign(new Error(`Upload to Cloudinary failed: ${detail}`), { status: 502 }));
+          return;
+        }
+        resolve(result);
+      },
     );
     stream.end(file.buffer);
   });
