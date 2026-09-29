@@ -62,9 +62,26 @@ if (missingCloudinary.length) {
   );
 }
 
-/** What /health reports, so a misconfigured deployment is visible without reading the logs. */
-export function storageStatus(): { type: StorageType; ready: boolean; missing: string[] } {
-  return { type: STORAGE_TYPE, ready: missingCloudinary.length === 0, missing: missingCloudinary };
+/**
+ * What /health reports, so a misconfigured deployment is visible without reading the logs.
+ *
+ * `cloudName` is included because a wrong one is the likeliest mistake — the Cloudinary console
+ * shows an API key table whose "Key Name" column reads `Root`, and copying that instead of the
+ * cloud name is an easy slip. It is safe to publish: the cloud name appears in the URL of every
+ * image the account serves. The key and secret are never reported.
+ */
+export function storageStatus(): {
+  type: StorageType;
+  ready: boolean;
+  missing: string[];
+  cloudName?: string;
+} {
+  return {
+    type: STORAGE_TYPE,
+    ready: missingCloudinary.length === 0,
+    missing: missingCloudinary,
+    ...(STORAGE_TYPE === 'cloudinary' ? { cloudName: cloudinary.config().cloud_name } : {}),
+  };
 }
 
 /**
