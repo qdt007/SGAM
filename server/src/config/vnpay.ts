@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { env } from '../utils/env';
 
 /**
  * VNPay 2.1.0. Everything here exists to reproduce one thing exactly: the string VNPay signs.
@@ -12,11 +13,11 @@ import crypto from 'crypto';
 export const VNPAY_SANDBOX_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
 
 export function vnpayConfigured(): boolean {
-  return !!(process.env.VNPAY_TMN_CODE && process.env.VNPAY_HASH_SECRET);
+  return !!(env('VNPAY_TMN_CODE') && env('VNPAY_HASH_SECRET'));
 }
 
 function payUrl(): string {
-  return process.env.VNPAY_PAY_URL || VNPAY_SANDBOX_URL;
+  return env('VNPAY_PAY_URL') ?? VNPAY_SANDBOX_URL;
 }
 
 /** Encoded, sorted, joined — the exact string VNPay hashes. */
@@ -28,7 +29,7 @@ function signData(params: Record<string, string>): string {
 }
 
 function sign(data: string): string {
-  return crypto.createHmac('sha512', process.env.VNPAY_HASH_SECRET!).update(Buffer.from(data, 'utf-8')).digest('hex');
+  return crypto.createHmac('sha512', env('VNPAY_HASH_SECRET')!).update(Buffer.from(data, 'utf-8')).digest('hex');
 }
 
 /** yyyyMMddHHmmss in GMT+7, which is the only timezone VNPay accepts. */
@@ -53,14 +54,14 @@ export function buildPaymentUrl(input: PaymentUrlInput): string {
   const params: Record<string, string> = {
     vnp_Version: '2.1.0',
     vnp_Command: 'pay',
-    vnp_TmnCode: process.env.VNPAY_TMN_CODE!,
+    vnp_TmnCode: env('VNPAY_TMN_CODE')!,
     vnp_Amount: String(input.amount * 100),
     vnp_CurrCode: 'VND',
     vnp_TxnRef: input.txnRef,
     vnp_OrderInfo: input.orderInfo,
     vnp_OrderType: 'other',
     vnp_Locale: 'vn',
-    vnp_ReturnUrl: process.env.VNPAY_RETURN_URL || 'http://localhost:5000/api/billing/vnpay/return',
+    vnp_ReturnUrl: env('VNPAY_RETURN_URL') ?? 'http://localhost:5000/api/billing/vnpay/return',
     vnp_IpAddr: input.ipAddr,
     vnp_CreateDate: vnpDate(now),
     vnp_ExpireDate: vnpDate(new Date(now.getTime() + (input.minutesValid ?? 15) * 60_000)),

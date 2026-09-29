@@ -3,6 +3,7 @@ import fsSync from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
+import { env } from '../utils/env';
 
 export type StorageType = 'local' | 'cloudinary';
 /** What a backend hands back for one saved file; maps straight onto the File columns. */
@@ -11,9 +12,9 @@ export interface StoredFile { filename: string; storageKey: string; url: string;
  *  and so can the seed script, which has bytes but never went through an HTTP upload. */
 export interface UploadInput { originalname: string; mimetype: string; buffer: Buffer; }
 
-export const STORAGE_TYPE: StorageType = process.env.STORAGE_TYPE === 'cloudinary' ? 'cloudinary' : 'local';
-export const UPLOADS_DIR = path.resolve(process.cwd(), process.env.UPLOADS_DIR || 'uploads');
-const CLOUDINARY_FOLDER = process.env.CLOUDINARY_FOLDER || 'pm-uploads';
+export const STORAGE_TYPE: StorageType = env('STORAGE_TYPE') === 'cloudinary' ? 'cloudinary' : 'local';
+export const UPLOADS_DIR = path.resolve(process.cwd(), env('UPLOADS_DIR') ?? 'uploads');
+const CLOUDINARY_FOLDER = env('CLOUDINARY_FOLDER') ?? 'pm-uploads';
 
 if (STORAGE_TYPE === 'local') fsSync.mkdirSync(UPLOADS_DIR, { recursive: true });
 
@@ -30,9 +31,12 @@ if (STORAGE_TYPE === 'local') fsSync.mkdirSync(UPLOADS_DIR, { recursive: true })
  */
 function configureCloudinary(): string[] {
   const provided: Record<string, string> = {};
-  if (process.env.CLOUDINARY_CLOUD_NAME) provided.cloud_name = process.env.CLOUDINARY_CLOUD_NAME;
-  if (process.env.CLOUDINARY_API_KEY) provided.api_key = process.env.CLOUDINARY_API_KEY;
-  if (process.env.CLOUDINARY_API_SECRET) provided.api_secret = process.env.CLOUDINARY_API_SECRET;
+  const cloudName = env('CLOUDINARY_CLOUD_NAME');
+  const apiKey = env('CLOUDINARY_API_KEY');
+  const apiSecret = env('CLOUDINARY_API_SECRET');
+  if (cloudName) provided.cloud_name = cloudName;
+  if (apiKey) provided.api_key = apiKey;
+  if (apiSecret) provided.api_secret = apiSecret;
 
   cloudinary.config({ ...provided, secure: true });
 

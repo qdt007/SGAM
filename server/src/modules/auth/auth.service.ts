@@ -2,6 +2,7 @@ import prisma from '../../config/db';
 import { hashPassword, comparePassword } from '../../utils/hash';
 import { generateSecret, generateSync, generateURI, verifySync } from 'otplib';
 import QRCode from 'qrcode';
+import { env } from '../../utils/env';
 import crypto from 'crypto';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, signTwoFactorChallenge, verifyTwoFactorChallenge } from '../../utils/jwt';
 import { RegisterInput, LoginInput } from './auth.schema';
@@ -189,17 +190,17 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
 export function googleConfigured(): boolean {
-  return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  return !!(env('GOOGLE_CLIENT_ID') && env('GOOGLE_CLIENT_SECRET'));
 }
 
 function callbackUrl(): string {
-  return process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback';
+  return env('GOOGLE_CALLBACK_URL') ?? 'http://localhost:5000/api/auth/google/callback';
 }
 
 /** The URL the browser is sent to. `state` is a signed nonce so the callback cannot be forged. */
 export function googleAuthUrl(state: string): string {
   const params = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID!,
+    client_id: env('GOOGLE_CLIENT_ID')!,
     redirect_uri: callbackUrl(),
     response_type: 'code',
     scope: 'openid email profile',
@@ -217,8 +218,8 @@ async function fetchGoogleProfile(code: string): Promise<GoogleProfile> {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: env('GOOGLE_CLIENT_ID')!,
+      client_secret: env('GOOGLE_CLIENT_SECRET')!,
       redirect_uri: callbackUrl(),
       grant_type: 'authorization_code',
     }),
