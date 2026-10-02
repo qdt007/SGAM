@@ -80,8 +80,8 @@ function CheckoutModal({ cycle, onClose }: { cycle: BillingCycle; onClose: () =>
           <div className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/[0.07] px-3 py-2.5 text-caption text-warning">
             <Icon icon="ph:info-fill" width={14} className="mt-px shrink-0" aria-hidden />
             <span>
-              Máy chủ này chưa cấu hình cổng thanh toán nên đây là thanh toán <b>mô phỏng</b>: không có tiền nào được
-              trừ. Đặt VNPAY_TMN_CODE và VNPAY_HASH_SECRET để bật thanh toán thật.
+              Đây là giao dịch <b>thử nghiệm</b> — không có tiền nào được trừ. Gói Pro sẽ được kích hoạt ngay
+              để bạn trải nghiệm đầy đủ tính năng.
             </span>
           </div>
         )}

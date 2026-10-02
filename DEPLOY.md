@@ -246,8 +246,21 @@ IPN là thứ duy nhất bật gói Pro. Return URL chỉ để báo tin cho ng�
 **IPN không chạy được trên localhost** — VNPay phải gọi vào được từ internet. Test local chỉ đi
 tới bước sang trang VNPay rồi quay về; muốn thử trọn vòng phải deploy, hoặc mở `ngrok`.
 
-**Nếu VNPay trả trang "The terminal (website) not approved":** đó là trạng thái tài khoản bên
-VNPay, không phải lỗi code. Đăng nhập portal kiểm tra website đã được duyệt chưa.
+**Mỗi TmnCode đi với đúng một HashSecret.** Dùng lẫn secret của terminal khác thì VNPay không
+báo "Sai chữ ký" — nó nhận chữ ký rồi mới chặn ở bước sau, nên lỗi trông như vấn đề khác hẳn.
+Lấy cả hai từ cùng một email cấu hình của VNPay.
+
+**Các mã lỗi VNPay trả về trên URL `Error.html?code=`** đều là trạng thái tài khoản merchant, không
+phải lỗi code — sửa trong portal hoặc liên hệ VNPay, đừng sửa `config/vnpay.ts`:
+
+| code | Nghĩa | Làm gì |
+|---|---|---|
+| 71 | Website chưa được phê duyệt | Chờ VNPay duyệt terminal |
+| 76 | Terminal chưa bật phương thức thanh toán nào | Khai IPN URL trong SIT Testing rồi chờ duyệt |
+| 03 | Dữ liệu gửi sang sai định dạng | Kiểm tra `vnp_Amount` (phải nhân 100) và `vnp_ExpireDate` |
+
+Khi terminal đã thông, mở URL checkout sẽ thấy 302 sang
+`/paymentv2/Transaction/PaymentMethod.html?token=...` — đó là trang chọn phương thức, tức đã chạy.
 
 ---
 
