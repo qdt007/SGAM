@@ -22,6 +22,10 @@ export const updateNotificationPrefsSchema = z.object({
   deadlineApproaching: z.boolean().optional(),
   projectInvite: z.boolean().optional(),
   fileUploaded: z.boolean().optional(),
+  chatMessage: z.boolean().optional(),
+  blockerRaised: z.boolean().optional(),
+  announcement: z.boolean().optional(),
+  projectUpdated: z.boolean().optional(),
   emailEnabled: z.boolean().optional(),
 });
 

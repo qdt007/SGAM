@@ -4,6 +4,8 @@ import { useSocket } from './useSocket';
 import { keys } from '../constants/queryKeys';
 
 const TASK_EVENTS = ['task:created', 'task:updated', 'task:deleted', 'task:moved'] as const;
+const CHAT_EVENTS = ['message:created', 'message:updated', 'message:deleted'] as const;
+const BLOCKER_EVENTS = ['blocker:created', 'blocker:updated', 'blocker:deleted'] as const;
 const PROJECT_EVENTS = [
   'project:updated',
   'member:added',
@@ -42,11 +44,25 @@ export function useProjectRealtime(projectId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: keys.projects.columns(projectId) });
     };
 
+    const refreshChat = () => {
+      // The pinned list is a separate query, so a pin has to invalidate both.
+      queryClient.invalidateQueries({ queryKey: keys.projects.messages(projectId) });
+      queryClient.invalidateQueries({ queryKey: keys.projects.pinnedMessages(projectId) });
+    };
+
+    const refreshBlockers = () => {
+      queryClient.invalidateQueries({ queryKey: keys.projects.blockers(projectId) });
+    };
+
     TASK_EVENTS.forEach((e) => on(e, refreshTasks));
     PROJECT_EVENTS.forEach((e) => on(e, refreshProject));
+    CHAT_EVENTS.forEach((e) => on(e, refreshChat));
+    BLOCKER_EVENTS.forEach((e) => on(e, refreshBlockers));
     return () => {
       TASK_EVENTS.forEach((e) => off(e, refreshTasks));
       PROJECT_EVENTS.forEach((e) => off(e, refreshProject));
+      CHAT_EVENTS.forEach((e) => off(e, refreshChat));
+      BLOCKER_EVENTS.forEach((e) => off(e, refreshBlockers));
     };
   }, [projectId, socket, on, off, queryClient]);
 }

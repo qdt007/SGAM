@@ -74,31 +74,48 @@ enum NotificationType {
   DEADLINE_APPROACHING
   PROJECT_INVITE
   FILE_UPLOADED
+  CHAT_MESSAGE
+  BLOCKER_RAISED
+  ANNOUNCEMENT
+  PROJECT_UPDATED
+}
+
+/// How much a blocker is hurting. Reuses nothing from Priority on purpose: a task's priority is
+/// chosen by whoever plans it, while this describes damage already being done.
+enum BlockerImpact {
+  BLOCKING
+  SERIOUS
+  MINOR
+}
+
+enum BlockerStatus {
+  OPEN
+  RESOLVED
 }
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  username     String     @unique
+  id                   String     @id @default(uuid())
+  email                String     @unique
+  username             String     @unique
   // Null for accounts created through Google: there is no password to compare against, and
   // password login refuses them by name rather than failing with "invalid credentials".
-  passwordHash String?
-  googleId     String?    @unique
-  displayName  String
-  avatarUrl    String?
+  passwordHash         String?
+  googleId             String?    @unique
+  displayName          String
+  avatarUrl            String?
   // Storage key of the uploaded avatar, so the old blob can be deleted when it is replaced.
   // Null when the avatar is an external URL or was never set.
-  avatarKey    String?
+  avatarKey            String?
   // TOTP two-factor. The secret exists as soon as setup starts but only counts once
   // twoFactorEnabled flips, so an abandoned setup never locks anyone out.
-  twoFactorSecret   String?
-  twoFactorEnabled  Boolean  @default(false)
+  twoFactorSecret      String?
+  twoFactorEnabled     Boolean    @default(false)
   // bcrypt hashes of single-use recovery codes; the plaintext is shown once and never stored.
   twoFactorBackupCodes String[]
-  globalRole   GlobalRole @default(USER)
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  globalRole           GlobalRole @default(USER)
+  isActive             Boolean    @default(true)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 
   projectMemberships ProjectMember[]
   assignedTasks      Task[]                  @relation("TaskAssignee")
@@ -109,6 +126,10 @@ model User {
   files              File[]
   refreshTokens      RefreshToken[]
   sentMentions       Mention[]
+  messages           Message[]
+  messageMentions    MessageMention[]
+  blockersRaised     Blocker[]               @relation("BlockersRaised")
+  blockersResolved   Blocker[]               @relation("BlockersResolved")
   notificationPrefs  NotificationPreference?
   subscription       Subscription?
   payments           Payment[]
@@ -162,6 +183,12 @@ model NotificationPreference {
   deadlineApproaching Boolean @default(true)
   projectInvite       Boolean @default(true)
   fileUploaded        Boolean @default(false)
+  // Off by default: a busy project chat would otherwise bury every other notification. Being
+  // @mentioned in chat is governed by `mentioned`, which is on, so this only gates the firehose.
+  chatMessage         Boolean @default(false)
+  blockerRaised       Boolean @default(true)
+  announcement        Boolean @default(true)
+  projectUpdated      Boolean @default(true)
   emailEnabled        Boolean @default(true)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -188,12 +215,15 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  members  ProjectMember[]
-  tasks    Task[]
-  comments Comment[]
-  files    File[]
-  tags     ProjectTag[]
-  columns  KanbanColumn[]
+  members       ProjectMember[]
+  tasks         Task[]
+  comments      Comment[]
+  files         File[]
+  tags          ProjectTag[]
+  columns       KanbanColumn[]
+  messages      Message[]
+  blockers      Blocker[]
+  notifications Notification[]
 }
 
 model ProjectMember {
@@ -271,6 +301,7 @@ model Task {
   blockedBy     TaskDependency[] @relation("BlockedTask")
   blocking      TaskDependency[] @relation("BlockingTask")
   notifications Notification[]
+  blockers      Blocker[]
 }
 
 model TaskDependency {
@@ -323,6 +354,64 @@ model Mention {
   @@unique([commentId, mentionedId])
 }
 
+/// A line in a project's chat. Separate from Comment because a comment is attached to a task and
+/// is part of that task's record; this is conversation, and deleting it loses nothing.
+model Message {
+  id        String    @id @default(uuid())
+  projectId String
+  authorId  String
+  body      String
+  /// Pinned messages are the "important announcement" case — the same row, raised in the UI and
+  /// notified to everyone rather than only to people who were mentioned.
+  pinned    Boolean   @default(false)
+  editedAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  project  Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author   User             @relation(fields: [authorId], references: [id])
+  mentions MessageMention[]
+
+  @@index([projectId, createdAt])
+}
+
+model MessageMention {
+  id          String @id @default(uuid())
+  messageId   String
+  mentionedId String
+
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mentioned User    @relation(fields: [mentionedId], references: [id])
+
+  @@unique([messageId, mentionedId])
+}
+
+/// Something going wrong that the team needs to see — a dependency that has not arrived, a
+/// decision nobody has made, a member who has gone quiet. Not a task: a task is work someone
+/// owns, this is an obstacle in front of the work, and it is resolved rather than completed.
+model Blocker {
+  id           String        @id @default(uuid())
+  projectId    String
+  raisedById   String
+  /// The task it is holding up, when it is only one.
+  taskId       String?
+  title        String
+  description  String?
+  impact       BlockerImpact @default(SERIOUS)
+  status       BlockerStatus @default(OPEN)
+  resolution   String?
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  raisedBy   User    @relation("BlockersRaised", fields: [raisedById], references: [id])
+  resolvedBy User?   @relation("BlockersResolved", fields: [resolvedById], references: [id])
+  task       Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+}
+
 model File {
   id           String   @id @default(uuid())
   uploaderId   String
@@ -348,12 +437,18 @@ model Notification {
   recipientId String
   type        NotificationType
   taskId      String?
+  // Set for anything that does not hang off a task — chat, blockers, announcements — so the
+  // client knows where to send someone who clicks it.
+  projectId   String?
   message     String
   isRead      Boolean          @default(false)
   createdAt   DateTime         @default(now())
 
-  recipient User  @relation(fields: [recipientId], references: [id], onDelete: Cascade)
-  task      Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  recipient User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId, isRead])
 }
 
 model TimeLog {

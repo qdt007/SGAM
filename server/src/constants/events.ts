@@ -4,4 +4,8 @@ export const SOCKET_EVENTS = {
   NOTIFICATION_NEW: 'notification:new', TIMER_CONFLICT: 'timer:conflict',
   PROJECT_UPDATED: 'project:updated', MEMBER_ADDED: 'member:added',
   MEMBER_UPDATED: 'member:updated', MEMBER_REMOVED: 'member:removed',
+  MESSAGE_CREATED: 'message:created', MESSAGE_UPDATED: 'message:updated',
+  MESSAGE_DELETED: 'message:deleted',
+  BLOCKER_CREATED: 'blocker:created', BLOCKER_UPDATED: 'blocker:updated',
+  BLOCKER_DELETED: 'blocker:deleted',
 } as const;

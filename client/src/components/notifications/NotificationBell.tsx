@@ -18,6 +18,10 @@ const TYPE_ICON: Record<NotificationType, { icon: string; color: string }> = {
   DEADLINE_APPROACHING: { icon: 'ph:clock-countdown-duotone', color: 'text-red-500' },
   PROJECT_INVITE: { icon: 'ph:users-three-duotone', color: 'text-emerald-500' },
   FILE_UPLOADED: { icon: 'ph:paperclip-duotone', color: 'text-sky-500' },
+  CHAT_MESSAGE: { icon: 'ph:chat-circle-text-duotone', color: 'text-indigo-500' },
+  BLOCKER_RAISED: { icon: 'ph:warning-octagon-duotone', color: 'text-red-500' },
+  ANNOUNCEMENT: { icon: 'ph:megaphone-duotone', color: 'text-primary' },
+  PROJECT_UPDATED: { icon: 'ph:folder-simple-duotone', color: 'text-amber-500' },
 };
 
 export function NotificationBell() {

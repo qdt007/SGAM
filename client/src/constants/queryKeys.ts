@@ -14,6 +14,10 @@ export const keys = {
     tags: (id: string) => ['projects', id, 'tags'] as const,
     files: (id: string) => ['projects', id, 'files'] as const,
     comments: (id: string) => ['projects', id, 'comments'] as const,
+    messages: (id: string) => ['projects', id, 'messages'] as const,
+    pinnedMessages: (id: string) => ['projects', id, 'messages', 'pinned'] as const,
+    blockers: (id: string, status?: string) =>
+      status ? (['projects', id, 'blockers', status] as const) : (['projects', id, 'blockers'] as const),
   },
   tasks: {
     byProject: (pid: string, f?: Record<string, unknown>) =>

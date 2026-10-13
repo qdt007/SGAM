@@ -245,6 +245,10 @@ const PREF_ITEMS: { key: keyof NotificationPrefs; label: string; desc: string }[
   { key: 'deadlineApproaching', label: 'Deadline Approaching', desc: '24h before a task is due' },
   { key: 'projectInvite', label: 'Project Invites', desc: "When you're added to a project" },
   { key: 'fileUploaded', label: 'File Uploads', desc: 'When files are added to your tasks' },
+  { key: 'projectUpdated', label: 'Project Changes', desc: 'When a project’s status, dates or name change' },
+  { key: 'announcement', label: 'Announcements', desc: 'When a message is pinned as important' },
+  { key: 'blockerRaised', label: 'Blockers', desc: 'When someone reports a difficulty on your project' },
+  { key: 'chatMessage', label: 'Every Chat Message', desc: 'Off by default — mentions still reach you' },
   { key: 'emailEnabled', label: 'Email Notifications', desc: 'Also send the above by email' },
 ];
 

@@ -1,7 +1,7 @@
 import prisma from '../../config/db';
 import { emitToProject } from '../../config/socket';
 import { SOCKET_EVENTS } from '../../constants/events';
-import { enqueueNotification } from '../../jobs/notificationQueue';
+import { enqueueNotification, fanoutNotification } from '../../jobs/notificationQueue';
 import { CreateProjectInput, UpdateProjectInput } from './projects.schema';
 import { NotificationType, ProjectRole } from '@prisma/client';
 
@@ -58,10 +58,26 @@ export async function getProject(projectId: string, userId: string) {
   return project;
 }
 
+/** The fields worth telling the team about, and what to call each one to a person. */
+const WATCHED_FIELDS = [
+  ['name', 'tên dự án'],
+  ['status', 'trạng thái'],
+  ['priority', 'độ ưu tiên'],
+  ['startDate', 'ngày bắt đầu'],
+  ['endDate', 'ngày kết thúc'],
+] as const;
+
 export async function updateProject(projectId: string, userId: string, input: UpdateProjectInput) {
   const member = await prisma.projectMember.findUnique({ where: { projectId_userId: { projectId, userId } } });
   if (!member || !['OWNER', 'MANAGER'].includes(member.role))
     throw Object.assign(new Error('Access denied'), { status: 403 });
+
+  // Read first so the notification can say what actually changed rather than "something changed".
+  const before = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { name: true, status: true, priority: true, startDate: true, endDate: true },
+  });
+
   const project = await prisma.project.update({
     where: { id: projectId },
     data: {
@@ -72,7 +88,44 @@ export async function updateProject(projectId: string, userId: string, input: Up
     include: { _count: { select: { tasks: true, members: true } } },
   });
   emitToProject(projectId, SOCKET_EVENTS.PROJECT_UPDATED, project);
+  if (before) await notifyProjectChange(project, before, userId);
   return project;
+}
+
+/**
+ * Tells the rest of the project what changed about it.
+ *
+ * Only the five fields in WATCHED_FIELDS count. A description being reworded is not news, and
+ * notifying on every field would make this the noisiest thing in the app — which is how people
+ * end up switching notifications off altogether.
+ */
+async function notifyProjectChange(
+  project: { id: string; name: string; status: string; priority: string; startDate: Date | null; endDate: Date | null },
+  before: { name: string; status: string; priority: string; startDate: Date | null; endDate: Date | null },
+  actorId: string,
+) {
+  const sameValue = (a: unknown, b: unknown) =>
+    a instanceof Date || b instanceof Date
+      ? (a as Date | null)?.getTime() === (b as Date | null)?.getTime()
+      : a === b;
+
+  const changed = WATCHED_FIELDS.filter(([field]) => !sameValue(before[field], project[field])).map(([, label]) => label);
+  if (!changed.length) return;
+
+  const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { displayName: true } });
+  const members = await prisma.projectMember.findMany({
+    where: { projectId: project.id, userId: { not: actorId } },
+    select: { userId: true },
+  });
+
+  await fanoutNotification(
+    members.map((m) => m.userId),
+    {
+      type: NotificationType.PROJECT_UPDATED,
+      projectId: project.id,
+      message: `${actor?.displayName ?? 'Ai đó'} đã cập nhật ${changed.join(', ')} của ${project.name}`,
+    },
+  );
 }
 
 export async function deleteProject(projectId: string, userId: string) {

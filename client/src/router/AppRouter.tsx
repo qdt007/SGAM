@@ -12,6 +12,8 @@ const ProjectDetailPage = lazy(() => import('../pages/projects/ProjectDetailPage
 const KanbanPage = lazy(() => import('../pages/kanban/KanbanPage').then((m) => ({ default: m.KanbanPage })));
 const GanttPage = lazy(() => import('../pages/gantt/GanttPage').then((m) => ({ default: m.GanttPage })));
 const ReportsPage = lazy(() => import('../pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const ChatPage = lazy(() => import('../pages/chat/ChatPage').then((m) => ({ default: m.ChatPage })));
+const BlockersPage = lazy(() => import('../pages/blockers/BlockersPage').then((m) => ({ default: m.BlockersPage })));
 const SettingsPage = lazy(() => import('../pages/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const AdminPage = lazy(() => import('../pages/admin/AdminPage').then((m) => ({ default: m.AdminPage })));
 const GoogleCallbackPage = lazy(() => import('../pages/auth/GoogleCallbackPage').then((m) => ({ default: m.GoogleCallbackPage })));
@@ -36,6 +38,8 @@ function AppLayout() {
           <Route path="projects/:projectId/kanban" element={<KanbanPage />} />
           <Route path="projects/:projectId/gantt" element={<GanttPage />} />
           <Route path="projects/:projectId/reports" element={<ReportsPage />} />
+          <Route path="projects/:projectId/chat" element={<ChatPage />} />
+          <Route path="projects/:projectId/blockers" element={<BlockersPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="admin" element={<AdminOnly><AdminPage /></AdminOnly>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

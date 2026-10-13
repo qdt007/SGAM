@@ -10,7 +10,13 @@ export type NotificationType =
   | 'MENTIONED'
   | 'DEADLINE_APPROACHING'
   | 'PROJECT_INVITE'
-  | 'FILE_UPLOADED';
+  | 'FILE_UPLOADED'
+  | 'CHAT_MESSAGE'
+  | 'BLOCKER_RAISED'
+  | 'ANNOUNCEMENT'
+  | 'PROJECT_UPDATED';
+export type BlockerImpact = 'BLOCKING' | 'SERIOUS' | 'MINOR';
+export type BlockerStatus = 'OPEN' | 'RESOLVED';
 export interface User {
   id: string;
   email: string;

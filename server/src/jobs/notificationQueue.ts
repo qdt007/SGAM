@@ -3,7 +3,14 @@ import prisma from '../config/db';
 import { emitToUser } from '../config/socket';
 import { SOCKET_EVENTS } from '../constants/events';
 
-export interface NotificationJobData { recipientId: string; type: NotificationType; taskId?: string; message: string; }
+export interface NotificationJobData {
+  recipientId: string;
+  type: NotificationType;
+  taskId?: string;
+  /** For anything not hanging off a task — chat, blockers, announcements, project changes. */
+  projectId?: string;
+  message: string;
+}
 
 /** Which preference column gates which notification type. */
 const PREF_FIELD: Record<NotificationType, string> = {
@@ -14,6 +21,10 @@ const PREF_FIELD: Record<NotificationType, string> = {
   DEADLINE_APPROACHING: 'deadlineApproaching',
   PROJECT_INVITE: 'projectInvite',
   FILE_UPLOADED: 'fileUploaded',
+  CHAT_MESSAGE: 'chatMessage',
+  BLOCKER_RAISED: 'blockerRaised',
+  ANNOUNCEMENT: 'announcement',
+  PROJECT_UPDATED: 'projectUpdated',
 };
 
 /**
@@ -22,7 +33,8 @@ const PREF_FIELD: Record<NotificationType, string> = {
  */
 export async function wantsNotification(recipientId: string, type: NotificationType): Promise<boolean> {
   const prefs = await prisma.notificationPreference.findUnique({ where: { userId: recipientId } });
-  if (!prefs) return type !== 'FILE_UPLOADED';
+  // Both of these are off by default in the schema, so an absent row must agree with it.
+  if (!prefs) return type !== 'FILE_UPLOADED' && type !== 'CHAT_MESSAGE';
   return (prefs as unknown as Record<string, boolean>)[PREF_FIELD[type]] ?? true;
 }
 
@@ -40,8 +52,8 @@ if (REDIS_AVAILABLE) {
       defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
     });
     q.process(async (job: { data: NotificationJobData }) => {
-      const { recipientId, type, taskId, message } = job.data;
-      const notification = await prisma.notification.create({ data: { recipientId, type, taskId, message } });
+      const { recipientId, type, taskId, projectId, message } = job.data;
+      const notification = await prisma.notification.create({ data: { recipientId, type, taskId, projectId, message } });
       emitToUser(recipientId, SOCKET_EVENTS.NOTIFICATION_NEW, notification);
     });
     q.on('failed', (job: { id: string }, err: Error) => console.error(`[Notification] Job ${job.id} failed:`, err.message));
@@ -57,7 +69,10 @@ if (REDIS_AVAILABLE) {
 async function processDirectly(data: NotificationJobData): Promise<void> {
   try {
     const notification = await prisma.notification.create({
-      data: { recipientId: data.recipientId, type: data.type, taskId: data.taskId, message: data.message },
+      data: {
+        recipientId: data.recipientId, type: data.type, taskId: data.taskId,
+        projectId: data.projectId, message: data.message,
+      },
     });
     emitToUser(data.recipientId, SOCKET_EVENTS.NOTIFICATION_NEW, notification);
   } catch { /* silent */ }

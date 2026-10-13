@@ -1,0 +1,11 @@
+{
+  "appId": "vn.sgam.app",
+  "appName": "SGAM",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

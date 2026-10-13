@@ -22,6 +22,10 @@ export interface NotificationPrefs {
   deadlineApproaching: boolean;
   projectInvite: boolean;
   fileUploaded: boolean;
+  chatMessage: boolean;
+  blockerRaised: boolean;
+  announcement: boolean;
+  projectUpdated: boolean;
   emailEnabled: boolean;
 }
 

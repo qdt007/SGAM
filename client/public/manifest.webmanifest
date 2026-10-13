@@ -1,0 +1,16 @@
+{
+  "name": "SGAM — Quản lý dự án",
+  "short_name": "SGAM",
+  "description": "Quản lý dự án, công việc, chat nhóm và theo dõi khó khăn.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#0066cc",
+  "lang": "vi",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

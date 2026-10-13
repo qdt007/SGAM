@@ -278,6 +278,35 @@
  * Plain CSS rather than `@apply`, because the rule is a media query plus three descendant
  * selectors — spelling it out reads better than bending utilities around it.
  */
+/* ─── Native shell ───────────────────────────────────────────────────────────
+   Plain CSS, outside @layer, so the safe-area values are never purged.
+
+   index.html asks for viewport-fit=cover, which lets the app paint the whole screen including
+   the notch and the home-indicator strip. These insets are what then keeps content out from
+   under them. env() resolves to 0px in a desktop browser, so the same rules are harmless there
+   and there is nothing to branch on. */
+body {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* A WebView has no browser chrome to scroll away, so overscroll bounce just reveals the
+   background and makes the app feel like a web page in a box. */
+html {
+  overscroll-behavior-y: none;
+}
+
+/* iOS zooms the whole page when a font-size under 16px takes focus, and never zooms back out. */
+@supports (-webkit-touch-callout: none) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 .row-action {
   flex-shrink: 0;
   opacity: 1;

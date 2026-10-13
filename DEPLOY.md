@@ -322,6 +322,29 @@ Khi terminal đã thông, mở URL checkout sẽ thấy 302 sang
 
 ---
 
+## App Android
+
+Không deploy ở đâu cả — nó là một file APK bạn gửi cho người ta. Chi tiết trong
+`mobile/README.md`; phần liên quan tới deploy chỉ có hai điều:
+
+**1. API phải cho phép origin của app.** Capacitor báo origin là `https://localhost` (Android) và
+`capacitor://localhost` (iOS). `server/src/config/cors.ts` đã khai sẵn trong `NATIVE_ORIGINS`, nên
+không phải thêm gì vào `CLIENT_URL`. Nếu ai xoá mấy dòng đó, app mở ra **trắng trang** và lý do chỉ
+hiện trong logcat.
+
+**2. Địa chỉ API nung vào lúc build.** APK không có server nào ở localhost để `/api` tương đối trỏ
+tới, nên nó phải là URL tuyệt đối và phải là https:
+
+```bash
+cd mobile
+echo https://pm-api-zdtj.onrender.com/api > api-url.txt
+npm run apk
+```
+
+Đổi domain API thì phải sửa file đó **và build lại APK** — bản đã phát ra không tự biết.
+
+---
+
 ## Checklist
 
 - [ ] `https://<render-url>/health` returns `{"status":"ok"}`
@@ -333,6 +356,11 @@ Khi terminal đã thông, mở URL checkout sẽ thấy 302 sang
 - [ ] A file attached to a task downloads after a hard refresh (Cloudinary works)
 - [ ] `/health` shows `"payments": { "configured": true }`
 - [ ] Upgrading to Pro opens payOS, and paying flips the account to PRO without a refresh
+- [ ] Chat nhóm gửi được, `@tên` một thành viên thì người đó thấy thông báo
+- [ ] Ghim một tin → cả nhóm nhận thông báo, tin hiện ở mục "Thông báo đã ghim"
+- [ ] Nêu một khó khăn mức "Đang chặn" → các thành viên khác nhận thông báo (và email nếu có SMTP)
+- [ ] Đổi trạng thái dự án → thành viên khác nhận thông báo nói rõ trường nào đổi
+- [ ] APK cài lên điện thoại, đăng nhập được và thấy đúng dữ liệu như trên web
 
 ---
 

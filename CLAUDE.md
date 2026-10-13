@@ -4,12 +4,17 @@ Context for Claude Code working in this repo. Read `ROADMAP.md` for what is buil
 
 ## What this is
 
-EXE101 course project: a full-stack project management app (projects → kanban columns → tasks), monorepo with two independent npm packages, no workspace tooling.
+EXE101 course project: a full-stack project management app (projects → kanban columns → tasks), monorepo with three independent npm packages, no workspace tooling.
 
 ```
 server/   Node + Express + Prisma + PostgreSQL + Socket.io   (port 5000)
 client/   React 18 + Vite + Tailwind + Zustand + React Query (port 5173)
+mobile/   Capacitor shell that packages client/'s build as an Android APK
 ```
+
+`mobile/` has no UI of its own — it builds `client/`, copies the output into `www/` and wraps it.
+A change to a screen reaches the phone through `cd mobile && npm run sync`, never by editing
+anything under `mobile/`. `mobile/README.md` covers building the APK.
 
 ## Running it
 
@@ -60,12 +65,30 @@ Shared pieces:
 
 ## Current state
 
-All nine backend modules have code: `auth`, `users`, `projects`, `tasks`, `comments`, `files`, `notifications`, `timeTracking`, `reports`. Every table in the Prisma schema is now reachable through an API. `ROADMAP.md` has the endpoint-by-endpoint list.
+All eleven backend modules have code: `auth`, `users`, `projects`, `tasks`, `comments`, `files`, `notifications`, `timeTracking`, `reports`, `messages`, `blockers`, plus `billing` and `admin`. Every table in the Prisma schema is now reachable through an API. `ROADMAP.md` has the endpoint-by-endpoint list.
 
 Things worth knowing before you change them:
 - **Task-scoped routes go through `authorizeTask()`**, which resolves the task to its project and checks the caller's `ProjectRole`. Never mount a `/api/tasks/:id/...` route with `authenticate` alone — that was a real hole, fixed on 2026-09-20.
 - **A user may only have one timer running at a time.** `timeTracking.service.startTimer` closes the previous one and emits `TIMER_CONFLICT` rather than letting two run.
-- **@handles only become mentions for members of that project**, checked in `comments.service.create`.
+- **@handles only become mentions for members of that project**, checked in `comments.service.create` and again in `messages.service.resolveProjectMentions`.
+- **`Message` is project chat, `Comment` is task discussion.** They are separate tables because a
+  comment is part of a task's record while chat is conversation. A **pinned** message is the
+  "important announcement": same row, and pinning is what notifies the whole project by
+  notification and email. Pinning is an OWNER/MANAGER action; editing the words stays the
+  author's, so a manager can pin someone else's message without rewriting it.
+- **`Blocker` is not a task.** A task is work someone owns and completes; a blocker is an
+  obstacle that gets *resolved*, often by someone it was never assigned to. Storing these as
+  tasks would make every count on the board and in the reports wrong. `BlockerImpact.BLOCKING`
+  is the only level that also sends email.
+- **Notification fanout is parallel, never a loop of `await`.** Use `fanoutNotification` and
+  `Promise.all` for the emails. Without Redis both funnels run inline, so a sequential loop costs
+  one SMTP round trip per recipient — that was a measured 2.3s on a six-person project.
+- **`Notification.projectId` exists so chat, blockers and project changes can deep-link.**
+  `NotificationBell` navigates by it; a notification with neither `taskId` nor `projectId` is not
+  clickable.
+- **`NotificationPreference.chatMessage` defaults to false** while `mentioned` stays true, so an
+  active chat cannot bury every other notification. `wantsNotification` has to agree with the
+  schema defaults for users who have no preference row.
 - **Reports count top-level tasks only** (`parentId: null`), so the numbers match what the list, board and gantt show. Subtasks are checklist items inside a task, not scope of their own — time logged on them still counts.
 - **Three payment providers, picked by `activeProvider()`: payOS → VNPay → MOCK.** Whichever
   credentials are present wins, payOS first. All three end in `activatePro()`, so a real payment
@@ -111,7 +134,7 @@ Things worth knowing before you change them:
 - **`GET /tasks/:id` returns tags as join rows**, `{ taskId, tagId, tag }` — the `TaskTag` type,
   not `Tag`. Reach for `t.tag.name`, not `t.name`.
 - **File bytes go through `config/storage.ts`, never straight to disk.** `STORAGE_TYPE` picks the backend: `local` (dev, writes to `UPLOADS_DIR`) or `cloudinary` (production). Multer buffers in memory and the backend decides where the bytes land, so `files.service` only ever sees `{ filename, storageKey, url }`. Cloudinary needs the same `resource_type` to delete that it got to upload, so `resourceTypeFor()` derives it from the mime type in both directions — change one and you orphan blobs. Image uploads drop the extension from the `public_id` because Cloudinary appends the format itself; `raw` keeps it.
-- **CORS and the Socket.io handshake share `config/cors.ts`.** `CLIENT_URL` is a comma-separated list; edit `isAllowedOrigin` rather than either call site, or the two drift apart and websockets fail while REST works.
+- **CORS and the Socket.io handshake share `config/cors.ts`.** `CLIENT_URL` is a comma-separated list; edit `isAllowedOrigin` rather than either call site, or the two drift apart and websockets fail while REST works. `NATIVE_ORIGINS` names the origins a Capacitor build reports (`https://localhost` on Android, `capacitor://localhost` on iOS) — remove them and the mobile app opens to a blank screen with the reason only visible in logcat. It is safe here because this API authenticates with a Bearer header, not a cookie.
 - **Socket emits are best-effort** (`io?.to(...)`), so a write never fails because the socket layer is down.
 - **Notifications and email go through `enqueueNotification` / `enqueueEmailToUser`**, which fall back to a direct write/send when Redis is absent. Don't call `prisma.notification.create` or `sendMail` directly from a service — those two funnels are where `NotificationPreference` is enforced, so bypassing them sends mail a user has switched off.
 - **`trust proxy` is on in production only** (`app.ts`). Render terminates TLS in front of the app; without it express-rate-limit buckets every caller under the proxy's IP.

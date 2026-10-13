@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SGAM</string>
+    <string name="title_activity_main">SGAM</string>
+    <string name="package_name">vn.sgam.app</string>
+    <string name="custom_url_scheme">vn.sgam.app</string>
+</resources>

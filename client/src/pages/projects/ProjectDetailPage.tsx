@@ -23,6 +23,8 @@ const VIEWS = [
   { to: 'kanban', label: 'Board', icon: 'ph:kanban-duotone' },
   { to: 'gantt', label: 'Timeline', icon: 'ph:chart-bar-horizontal-duotone' },
   { to: 'reports', label: 'Reports', icon: 'ph:chart-line-up-duotone' },
+  { to: 'chat', label: 'Chat', icon: 'ph:chat-circle-text-duotone' },
+  { to: 'blockers', label: 'Khó khăn', icon: 'ph:warning-octagon-duotone' },
 ];
 
 export function ProjectDetailPage() {

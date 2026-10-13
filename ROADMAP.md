@@ -181,6 +181,52 @@ Test thật trên DB: 7 nhánh IPN đều đúng, gói lên PRO ACTIVE đúng h�
 
 ---
 
+## Phase 8 — payOS, chat nhóm, khó khăn, app Android (2026-10-13)
+
+### Thanh toán: thêm payOS làm cổng chính
+- ✅ **`config/payos.ts`** — bọc SDK `@payos/node`, **không có HMAC nào trong đó**. VNPay bắt tự tái tạo chuỗi ký đến từng ký tự và mọi sai lệch chỉ trả "Sai chữ ký"; payOS tự ký và tự xác thực, nên dependency này mua đứt cả một nhóm lỗi.
+- ✅ **`activeProvider()`: payOS → VNPay → MOCK** — có credential nào thì dùng cái đó. VNPay giữ lại chứ không xoá. Cả ba cùng kết ở `activatePro()`.
+- ✅ **Webhook là nơi duy nhất bật Pro** — `POST /api/billing/payos/webhook`, trả 2xx cho mọi thứ đã xử lý xong (kể cả giao dịch không phải của mình, vì payOS gửi một giao dịch mẫu lúc đăng ký URL) nhưng **401 khi sai chữ ký**, vì 2xx sẽ làm payOS ngừng gửi lại.
+- ✅ **`npm run payos:webhook -- <url>`** đăng ký webhook; payOS gọi thử ngay nên server phải đang thức.
+- ✅ **`/health` báo thiếu biến nào** thay vì chỉ fail.
+- 🐞 **Sửa `getPlans()`** vốn luôn trả `simulated: true` — nó nói giao dịch là giả ngay cả khi VNPay đang chạy thật.
+
+### Chat nhóm — `server/src/modules/messages/`
+- ✅ `Message` tách khỏi `Comment`: comment thuộc hồ sơ của một task, chat là trao đổi về cả dự án.
+- ✅ **Ghim = thông báo quan trọng** — cùng một dòng dữ liệu, ghim là hành động thông báo cho toàn dự án qua notification *và* email. Ghim là quyền OWNER/MANAGER; sửa chữ vẫn là của tác giả.
+- ✅ `@tên` chỉ thành mention với thành viên dự án, đúng luật mà comments đang theo.
+- ✅ Phân trang theo con trỏ id (không theo timestamp — hai tin có thể trùng milisecond).
+- ✅ VIEWER đọc được, không gửi được.
+
+### Khó khăn & rủi ro — `server/src/modules/blockers/`
+- ✅ `Blocker` **không phải task**: task là việc có người nhận và hoàn thành, blocker là chướng ngại được *xử lý*, thường bởi người không được giao. Lưu thành task là làm sai mọi con số trên board và trong báo cáo.
+- ✅ Ba mức `BlockerImpact`; chỉ `BLOCKING` mới gửi email.
+- ✅ Resolve có ghi lại **cách xử lý** — phần đáng giá cho lần sau.
+- ✅ Mọi thành viên nêu được; xoá là quyền OWNER/MANAGER, còn lại dùng "đã xử lý".
+
+### Notification
+- ✅ Bốn loại mới: `CHAT_MESSAGE`, `BLOCKER_RAISED`, `ANNOUNCEMENT`, `PROJECT_UPDATED`, kèm bốn ô tắt/mở trong Settings.
+- ✅ **`Notification.projectId`** để chat/blocker/thay đổi dự án bấm vào đi đúng chỗ.
+- ✅ **Thay đổi dự án có thông báo** — chỉ 5 trường đáng kể (tên, trạng thái, ưu tiên, hai mốc ngày) và câu thông báo nói rõ cái gì đổi, không phải "có gì đó đổi".
+- ✅ `chatMessage` mặc định **tắt**, `mentioned` vẫn bật — chat sôi nổi không được phép chôn vùi mọi thông báo khác.
+- 🐞 **Fanout chuyển sang song song** — vòng lặp `await` cũ tốn một lượt SMTP mỗi người: đo được **2.3 giây** cho dự án 6 người.
+
+### App Android — `mobile/`
+- ✅ **Capacitor bọc chính `client/`**, không viết lại. Viết lại ~40 màn hình bằng React Native là một frontend thứ hai phải nuôi, và không kịp cho môn học.
+- ✅ `npm run apk` → `android/app/build/outputs/apk/debug/app-debug.apk`.
+- ✅ Địa chỉ API **nung vào lúc build** (`api-url.txt`) — trong APK không có server nào ở localhost để `/api` tương đối trỏ tới. Bắt buộc https, vì Android 9+ chặn cleartext.
+- ✅ **`NATIVE_ORIGINS` trong `config/cors.ts`** — Capacitor báo origin `https://localhost` (Android) và `capacitor://localhost` (iOS). Thiếu là app mở ra trắng trang, lý do chỉ thấy trong logcat. An toàn vì API này xác thực bằng Bearer header, không phải cookie.
+- ✅ **PWA**: manifest + theme-color + safe-area cho tai thỏ + `font-size: 16px` cho input trên iOS (dưới 16px là iOS tự zoom và không zoom lại).
+- ✅ 74 icon/splash sinh từ `assets/icon.svg`.
+- ⚠️ **Ghim ở Capacitor 6 vì máy build có JDK 17.** Capacitor 7 và 8 biên dịch với Java 21 và chết bằng `error: invalid source release: 21`. Cài JDK 21 rồi nâng là xong, `client/` không phải sửa gì — `mobile/README.md` có đúng bốn câu lệnh.
+
+### Chưa làm
+- **iOS** — `npx cap add ios` là chạy được, nhưng cần máy Mac có Xcode và tài khoản Apple Developer 99$/năm để chạy trên máy thật.
+- **Play Store** — cần tài khoản 25$, keystore thật, và privacy policy. APK debug chỉ để sideload.
+- **Push notification trên điện thoại** — hiện vẫn là Socket.io khi app đang mở; push thật cần Firebase Cloud Messaging.
+
+---
+
 ## Nợ kỹ thuật còn lại
 
 - [ ] Test mới phủ logic thuần và contract API; chưa có integration test chạm DB thật (cần DB riêng cho test)
