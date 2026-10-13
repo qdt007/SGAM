@@ -36,11 +36,20 @@ if (!/^https:\/\//.test(API_URL)) {
   process.exit(1);
 }
 
-console.log(`Building the client against ${API_URL} ...`);
+/**
+ * Socket.io connects to the server's origin, not to /api, and `useSocket` falls back to
+ * http://localhost:5000 when VITE_SOCKET_URL is unset. Inside an APK that localhost is the phone,
+ * so leaving it unset does not fail loudly — realtime simply never connects and new messages stop
+ * appearing on their own. Derived here rather than configured twice, so the two cannot disagree.
+ */
+const SOCKET_URL = new URL(API_URL).origin;
+
+console.log(`Building the client against ${API_URL}`);
+console.log(`Socket.io will connect to ${SOCKET_URL}`);
 execSync('npm run build', {
   cwd: client,
   stdio: 'inherit',
-  env: { ...process.env, VITE_API_URL: API_URL },
+  env: { ...process.env, VITE_API_URL: API_URL, VITE_SOCKET_URL: SOCKET_URL },
 });
 
 const dist = join(client, 'dist');

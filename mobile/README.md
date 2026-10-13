@@ -91,6 +91,10 @@ npm run open     # open the project in Android Studio (emulator, logcat, device 
 npm run doctor   # Capacitor's own environment check
 ```
 
+**Build through `npm run apk`, not `node scripts/build-apk.mjs`.** That script only runs Gradle.
+The web bundle is rebuilt and synced by the two steps in front of it, so calling it directly
+repackages whatever was in `www/` last time and produces an APK that looks new and is not.
+
 To watch the live dev server on a phone instead of a bundled build, add `server.url` to
 `capacitor.config.json` pointing at your machine's LAN address, run `npm run sync`, and remove it
 before building anything you intend to hand out.
@@ -103,6 +107,10 @@ before building anything you intend to hand out.
   nothing on screen to explain it.
 - **Changing `client/` is not enough.** The APK carries a copy of the build. Run `npm run sync`
   (or `npm run apk`) or the phone keeps showing the old UI.
+- **Two URLs are baked in, not one.** `VITE_API_URL` is the REST base and `VITE_SOCKET_URL` is
+  the server's *origin* — Socket.io does not connect to `/api`. `build-web.mjs` derives the
+  second from the first so they cannot disagree. Getting this wrong fails silently: REST works,
+  and realtime simply never connects, so new messages stop appearing on their own.
 - **Icons come from `assets/icon.svg`.** After changing it, run
   `npx capacitor-assets generate --android` to regenerate all 74 files.
 - **`android/` is committed, `android/build/` is not.** The native project is part of the repo so
