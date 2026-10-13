@@ -4,14 +4,32 @@ import prisma from '../../config/db';
 import { PLANS, priceFor, periodEndFrom, limitsFor, yearlySavingPercent } from '../../constants/plans';
 import { CheckoutInput, ConfirmInput } from './billing.schema';
 import { buildPaymentUrl, verifyCallback, vnpayConfigured } from '../../config/vnpay';
+import { createPaymentLink, payosConfigured, verifyWebhook, type WebhookData } from '../../config/payos';
+import type { Webhook } from '@payos/node';
+import { env } from '../../utils/env';
 
 /**
- * Real payments go through VNPay when it is configured; otherwise `checkout` opens a PENDING
- * row and `confirm` marks it paid, which is what keeps local development runnable without
- * merchant credentials. Only `checkout` and the IPN handler talk to the provider.
+ * Three ways to pay, picked by which credentials are present. payOS is the real one; VNPay is
+ * kept because it works and took long enough to get working that throwing it away would be
+ * careless; MOCK opens a PENDING row and lets `confirm` mark it paid, which is what keeps a
+ * developer machine with no merchant account runnable.
+ *
+ * Only `checkout` and the two callback handlers talk to a provider. Everything downstream of
+ * `activatePro` is identical whichever one was used, so a real payment and a simulated one
+ * leave the subscription in exactly the same state.
  */
 export const PROVIDER = 'MOCK';
 export const VNPAY_PROVIDER = 'VNPAY';
+export const PAYOS_PROVIDER = 'PAYOS';
+
+export type Provider = typeof PROVIDER | typeof VNPAY_PROVIDER | typeof PAYOS_PROVIDER;
+
+/** payOS wins when both are configured — it is the one with a real merchant account behind it. */
+export function activeProvider(): Provider {
+  if (payosConfigured()) return PAYOS_PROVIDER;
+  if (vnpayConfigured()) return VNPAY_PROVIDER;
+  return PROVIDER;
+}
 
 const subscriptionSelect = {
   id: true,
@@ -92,32 +110,51 @@ export async function getMine(userId: string) {
 }
 
 export function getPlans() {
+  const provider = activeProvider();
   return {
     plans: [PLANS.FREE, PLANS.PRO],
     currency: 'VND',
     yearlySavingPercent: yearlySavingPercent(),
     /** The UI shows this so nobody mistakes the demo flow for a real charge. */
-    simulated: true,
-    provider: PROVIDER,
+    simulated: provider === PROVIDER,
+    provider,
   };
 }
 
+const paymentSelect = { providerRef: true, amount: true, cycle: true, createdAt: true };
+
+/** Where payOS sends the browser back to. Its own URL, because this server has to read it. */
+function payosReturnUrl(): string {
+  return env('PAYOS_RETURN_URL') ?? 'http://localhost:5000/api/billing/payos/return';
+}
+
 /**
- * Opens a pending payment. Nothing changes on the subscription until the gateway confirms.
+ * payOS wants a positive integer that is unique to the merchant for all time. Milliseconds
+ * since the epoch with three random digits appended stays inside Number.MAX_SAFE_INTEGER
+ * until the year 2255, and needs no round trip to the database to check for collisions.
+ */
+function newOrderCode(): number {
+  return Date.now() * 1000 + crypto.randomInt(1000);
+}
+
+/**
+ * Opens a pending payment. Nothing changes on the subscription until the provider confirms.
  *
- * With VNPay configured this returns a URL to send the browser to; without it, the old
+ * With a gateway configured this returns a URL to send the browser to; without one, the
  * simulated reference, so the app still runs on a machine with no merchant credentials.
  */
 export async function checkout(userId: string, input: CheckoutInput, ipAddr = '127.0.0.1') {
   const sub = await ensureSubscription(userId);
   const amount = priceFor(input.cycle);
-  const live = vnpayConfigured();
+  const provider = activeProvider();
+
+  if (provider === PAYOS_PROVIDER) return checkoutPayos(userId, sub.id, input, amount);
 
   // An unpaid order for the same cycle is reused rather than stacked up. VNPay accepts a repeat
   // of a TxnRef that was never paid, so the customer just gets a fresh URL for the same order.
   const pending = await prisma.payment.findFirst({
-    where: { userId, status: 'PENDING', cycle: input.cycle, provider: live ? VNPAY_PROVIDER : PROVIDER },
-    select: { providerRef: true, amount: true, cycle: true, createdAt: true },
+    where: { userId, status: 'PENDING', cycle: input.cycle, provider },
+    select: paymentSelect,
   });
 
   const payment =
@@ -128,18 +165,22 @@ export async function checkout(userId: string, input: CheckoutInput, ipAddr = '1
         userId,
         amount,
         cycle: input.cycle,
-        provider: live ? VNPAY_PROVIDER : PROVIDER,
+        provider,
         // VNPay wants a short alphanumeric reference, unique per merchant.
-        providerRef: live ? crypto.randomBytes(10).toString('hex') : `${PROVIDER}-${crypto.randomUUID()}`,
+        providerRef:
+          provider === VNPAY_PROVIDER
+            ? crypto.randomBytes(10).toString('hex')
+            : `${PROVIDER}-${crypto.randomUUID()}`,
         status: 'PENDING',
       },
-      select: { providerRef: true, amount: true, cycle: true, createdAt: true },
+      select: paymentSelect,
     }));
 
-  if (!live) return { ...payment, reused: !!pending, simulated: true };
+  if (provider === PROVIDER) return { ...payment, provider, reused: !!pending, simulated: true };
 
   return {
     ...payment,
+    provider,
     reused: !!pending,
     simulated: false,
     paymentUrl: buildPaymentUrl({
@@ -148,6 +189,59 @@ export async function checkout(userId: string, input: CheckoutInput, ipAddr = '1
       orderInfo: `Nang cap SGAM Pro ${input.cycle === 'YEARLY' ? 'nam' : 'thang'}`,
       ipAddr,
     }),
+  };
+}
+
+/**
+ * A payOS order is never reused: `orderCode` is unique per merchant for ever, and asking for a
+ * link with one that already exists is an error rather than a second link. Each checkout
+ * therefore gets a fresh code, and anything the customer walked away from is closed first —
+ * otherwise their payment history fills with PENDING rows nobody is ever going to pay.
+ *
+ * The abandoned links are left to lapse on their own rather than cancelled over the network:
+ * `expiredAt` already closes them, and a provider call here would put checkout at the mercy of
+ * a round trip that has nothing to do with the order being opened.
+ */
+async function checkoutPayos(userId: string, subscriptionId: string, input: CheckoutInput, amount: number) {
+  await prisma.payment.updateMany({
+    where: { userId, status: 'PENDING', provider: PAYOS_PROVIDER },
+    // The enum has no CANCELLED; FAILED is the nearest it offers to "abandoned before paying".
+    data: { status: PaymentStatus.FAILED },
+  });
+
+  const orderCode = newOrderCode();
+  const payment = await prisma.payment.create({
+    data: {
+      subscriptionId,
+      userId,
+      amount,
+      cycle: input.cycle,
+      provider: PAYOS_PROVIDER,
+      providerRef: String(orderCode),
+      status: 'PENDING',
+    },
+    select: paymentSelect,
+  });
+
+  const url = payosReturnUrl();
+  const link = await createPaymentLink({
+    orderCode,
+    amount,
+    // payOS puts this in the bank transfer content and unlinked accounts get 9 characters, so
+    // the cycle is not in here — orderCode is what identifies the order.
+    description: 'SGAM Pro',
+    returnUrl: url,
+    cancelUrl: url,
+  });
+
+  return {
+    ...payment,
+    provider: PAYOS_PROVIDER,
+    reused: false,
+    simulated: false,
+    paymentUrl: link.checkoutUrl,
+    /** The VietQR payload, so the modal can draw the code instead of sending the browser away. */
+    qrCode: link.qrCode,
   };
 }
 
@@ -198,6 +292,64 @@ export async function readVnpayReturn(query: Record<string, string>) {
     valid,
     succeeded: valid && query.vnp_ResponseCode === '00' && query.vnp_TransactionStatus === '00',
     // The IPN usually lands first, but not always; the page says "processing" rather than lying.
+    settled: payment?.status === 'PAID',
+    providerRef: ref,
+  };
+}
+
+/** What payOS expects back. Any non-2xx answer makes it redeliver the same transaction. */
+export interface WebhookReply { success: boolean; message?: string }
+
+/**
+ * The authoritative side of a payOS payment, and the only thing that grants Pro.
+ *
+ * `verifyWebhook` throws unless the payload was signed with our checksum key, so nothing below
+ * it is reachable from a forged request; the controller turns that throw into a 401.
+ *
+ * Everything it has definitively dealt with answers success, including a transaction that is
+ * not ours. payOS redelivers on anything else, and its own registration check posts a sample
+ * transaction that will never match a row here — refusing that would reject the webhook URL.
+ */
+export async function handlePayosWebhook(body: unknown): Promise<WebhookReply> {
+  const data: WebhookData = await verifyWebhook(body as Webhook);
+
+  const payment = await prisma.payment.findUnique({
+    where: { providerRef: String(data.orderCode) },
+    select: { id: true, userId: true, status: true, cycle: true, amount: true },
+  });
+  if (!payment) return { success: true, message: 'No such order' };
+  if (payment.status === 'PAID') return { success: true, message: 'Already confirmed' };
+
+  // payOS sends whole dong, the same unit the row is stored in, so these compare directly —
+  // unlike VNPay, which multiplies by 100. A mismatch means the order was altered in flight.
+  if (data.amount !== payment.amount) {
+    await prisma.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.FAILED } });
+    return { success: true, message: 'Amount mismatch' };
+  }
+  if (data.code !== '00') {
+    await prisma.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.FAILED } });
+    return { success: true, message: 'Payment did not succeed' };
+  }
+
+  await activatePro(payment.userId, payment.id, payment.cycle);
+  return { success: true };
+}
+
+/**
+ * Read-only view for the page the customer lands back on; it never grants anything. payOS does
+ * not sign the return query, so anyone can type it — `settled` comes from our own row, which
+ * only the webhook can have written.
+ */
+export async function readPayosReturn(query: Record<string, string>) {
+  const ref = query.orderCode ?? '';
+  const payment = ref
+    ? await prisma.payment.findUnique({ where: { providerRef: ref }, select: { status: true } })
+    : null;
+  const cancelled = query.cancel === 'true' || query.status === 'CANCELLED';
+  return {
+    cancelled,
+    succeeded: !cancelled && query.code === '00' && query.status === 'PAID',
+    // The webhook usually lands first, but not always; the page says "processing" rather than lying.
     settled: payment?.status === 'PAID',
     providerRef: ref,
   };

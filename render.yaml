@@ -55,6 +55,14 @@ services:
       # VNPay. Unset means checkout stays simulated; the rest of billing works either way.
       # The IPN URL is set in VNPay's portal, not here:
       #   https://pm-api-zdtj.onrender.com/api/billing/vnpay/ipn
+      - key: PAYOS_CLIENT_ID
+        sync: false
+      - key: PAYOS_API_KEY
+        sync: false
+      - key: PAYOS_CHECKSUM_KEY
+        sync: false
+      - key: PAYOS_RETURN_URL
+        value: https://pm-api-zdtj.onrender.com/api/billing/payos/return
       - key: VNPAY_TMN_CODE
         sync: false
       - key: VNPAY_HASH_SECRET

@@ -67,13 +67,24 @@ Things worth knowing before you change them:
 - **A user may only have one timer running at a time.** `timeTracking.service.startTimer` closes the previous one and emits `TIMER_CONFLICT` rather than letting two run.
 - **@handles only become mentions for members of that project**, checked in `comments.service.create`.
 - **Reports count top-level tasks only** (`parentId: null`), so the numbers match what the list, board and gantt show. Subtasks are checklist items inside a task, not scope of their own — time logged on them still counts.
-- **Payments are real when VNPay is configured, simulated when it is not.** `VNPAY_TMN_CODE` +
-  `VNPAY_HASH_SECRET` switch `billing.service.checkout` from returning a mock reference to
-  returning a `paymentUrl`. Both paths end in `activatePro()`, so a real payment and a simulated
-  one leave the subscription in the same state.
-- **Only the IPN grants Pro.** `GET /api/billing/vnpay/ipn` is the authoritative callback and is
-  unauthenticated by necessity — VNPay has no session — so nothing is trusted before the HMAC
-  over the query string verifies. The browser return URL only reports; it never grants.
+- **Three payment providers, picked by `activeProvider()`: payOS → VNPay → MOCK.** Whichever
+  credentials are present wins, payOS first. All three end in `activatePro()`, so a real payment
+  and a simulated one leave the subscription in the same state. `getPlans().simulated` is derived
+  from this, not hardcoded.
+- **payOS is the live gateway and its signing is the SDK's job.** `config/payos.ts` is a thin
+  wrapper over `@payos/node` and deliberately contains no HMAC — see the VNPay note below for
+  why that is worth a dependency. Its three credentials must come from the *same* payment
+  channel; mixing channels reports as a signature error, not a credential error.
+- **payOS `orderCode` is an integer, unique per merchant for ever.** Asking for a second link
+  with a used code is an error, so `checkoutPayos` mints a fresh one every time and marks the
+  previous PENDING rows FAILED. `description` is capped at 9 characters for unlinked bank
+  accounts, and payOS sends amounts in whole dong where VNPay multiplies by 100.
+- **Only the server-to-server callback grants Pro** — `POST /api/billing/payos/webhook` for
+  payOS, `GET /api/billing/vnpay/ipn` for VNPay. Both are unauthenticated by necessity (neither
+  gateway has a session) and neither trusts anything before the signature verifies. The browser
+  return URLs only report. The payOS webhook answers 2xx for everything it has handled —
+  including a transaction that is not ours, since payOS posts a sample one to register the URL —
+  but 401 on a bad signature, because 2xx would stop it retrying.
 - **`config/vnpay.ts` reproduces VNPay's signing byte for byte.** It is not "URL-encode the
   query": keys are encoded then sorted, values encoded with `%20` rewritten to `+`, joined
   without re-encoding. `URLSearchParams` escapes `!'()*` differently and every difference comes

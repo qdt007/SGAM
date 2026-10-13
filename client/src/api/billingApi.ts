@@ -4,6 +4,14 @@ export type PlanTier = 'FREE' | 'PRO';
 export type BillingCycle = 'MONTHLY' | 'YEARLY';
 export type SubscriptionStatus = 'ACTIVE' | 'CANCELLED' | 'EXPIRED';
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+export type PaymentProvider = 'PAYOS' | 'VNPAY' | 'MOCK';
+
+/** What each provider is called in front of a customer. */
+export const PROVIDER_NAME: Record<PaymentProvider, string> = {
+  PAYOS: 'payOS',
+  VNPAY: 'VNPay',
+  MOCK: 'thử nghiệm',
+};
 
 export interface PlanLimits {
   maxOwnedProjects: number | null;
@@ -58,7 +66,7 @@ export interface PlanCatalogue {
   yearlySavingPercent: number;
   /** True while payments are simulated rather than charged by a real gateway. */
   simulated: boolean;
-  provider: string;
+  provider: PaymentProvider;
 }
 
 export interface CheckoutSession {
@@ -68,8 +76,12 @@ export interface CheckoutSession {
   createdAt: string;
   reused: boolean;
   simulated: boolean;
+  /** Which gateway opened this session, so the UI can name it rather than guess. */
+  provider: PaymentProvider;
   /** Present only when a real gateway is configured; the browser is sent here to pay. */
   paymentUrl?: string;
+  /** payOS only: the VietQR payload behind the hosted page. */
+  qrCode?: string;
 }
 
 export const billingApi = {

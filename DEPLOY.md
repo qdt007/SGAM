@@ -1,4 +1,4 @@
-# Deploying — step by step
+  # Deploying — step by step
 
 Written for someone who has not used these sites before. Follow it top to bottom.
 Nothing here gets installed on your computer; every step is a web page or a command you paste.
@@ -217,12 +217,70 @@ the previous run's files out of Cloudinary.
 
 ---
 
-## VNPay (thanh toán)
+## payOS (thanh toán thật)
 
-Checkout chỉ chạy thật khi `VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET` được đặt. Không có thì nó tự
-quay về chế độ mô phỏng, nên máy dev không cần tài khoản merchant.
+Cổng chính. Checkout chọn nhà cung cấp theo biến môi trường nào có mặt: **payOS → VNPay → mô
+phỏng**. Máy dev không đặt gì cả thì vẫn chạy ở chế độ mô phỏng, không cần tài khoản merchant.
 
-**Trên Render → Environment** đặt hai biến đó. `VNPAY_RETURN_URL` đã khai sẵn trong `render.yaml`.
+**1. Lấy khoá.** Đăng nhập https://my.payos.vn, vào kênh thanh toán của bạn, lấy ba giá trị.
+Cả ba phải cùng **một** kênh — trộn khoá của hai kênh là lỗi khó thấy nhất, vì nó không báo sai
+khoá mà báo sai chữ ký.
+
+**2. Đặt trên Render → Environment:**
+
+| Biến | Lấy ở đâu |
+|---|---|
+| `PAYOS_CLIENT_ID` | Kênh thanh toán → Client ID |
+| `PAYOS_API_KEY` | Kênh thanh toán → API Key |
+| `PAYOS_CHECKSUM_KEY` | Kênh thanh toán → Checksum Key |
+
+`PAYOS_RETURN_URL` đã khai sẵn trong `render.yaml`.
+
+**3. Đăng ký webhook.** payOS không gửi gì cho tới khi URL được đăng ký, và việc đăng ký không
+phải là lưu một chuỗi: payOS **gọi thử ngay lập tức** và từ chối nếu URL không trả 2xx. Nên
+server phải đã deploy và đang thức. Mở `/health` trước cho Render dậy, rồi:
+
+```bash
+cd server
+npm run payos:webhook -- https://pm-api-zdtj.onrender.com/api/billing/payos/webhook
+```
+
+Chạy từ máy bạn cũng được — nó chỉ gọi API payOS, không cần chạy trên server.
+
+**4. Kiểm tra.** `GET /health` trả thêm `payments`:
+
+```json
+"payments": { "configured": true, "missing": [] }
+```
+
+`missing` liệt kê đúng biến nào còn thiếu.
+
+**Webhook là thứ duy nhất bật gói Pro.** `POST /api/billing/payos/webhook` không có session —
+payOS không có — nên không có gì được tin trước khi SDK xác thực chữ ký. URL return chỉ báo tin,
+vì ai cũng gõ tay được.
+
+**Không dựng lại chữ ký bằng tay.** `config/payos.ts` dùng SDK `@payos/node` cho cả ký lẫn xác
+thực. VNPay bắt phải tự tái tạo chuỗi ký đến từng ký tự và mọi sai lệch đều trả về "Sai chữ ký"
+không kèm manh mối — đó chính là lý do SDK ở đây là một dependency chứ không phải 90 dòng HMAC.
+
+**Vài ràng buộc của payOS dễ vấp:**
+
+- `orderCode` là **số nguyên**, duy nhất với merchant **vĩnh viễn**. Xin link lần hai với cùng
+  một mã là lỗi, không phải link mới. Nên mỗi lần checkout sinh mã mới và đóng đơn cũ.
+- `description` bị cắt còn **9 ký tự** với tài khoản ngân hàng chưa liên kết qua payOS. Đó là
+  nội dung chuyển khoản người trả nhìn thấy, nên ở đây để `SGAM Pro`.
+- Số tiền payOS gửi về là **đồng nguyên**, khác VNPay nhân 100.
+
+**Webhook không chạy được trên localhost** — payOS phải gọi vào được từ internet. Muốn thử trọn
+vòng ở máy thì đặt `ngrok` phía trước rồi đăng ký URL của ngrok.
+
+---
+
+## VNPay (dự phòng)
+
+Giữ lại và vẫn chạy được, nhưng chỉ được dùng khi **không** có khoá payOS. Đặt
+`VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET` trên Render; `VNPAY_RETURN_URL` đã khai sẵn trong
+`render.yaml`. Bỏ trống cả hai lẫn khoá payOS thì checkout quay về mô phỏng.
 
 **Trong portal VNPay** (https://sandbox.vnpayment.vn/merchantv2/) khai IPN URL:
 
@@ -273,6 +331,8 @@ Khi terminal đã thông, mở URL checkout sẽ thấy 302 sang
 - [ ] Dragging a card on the Kanban board sticks after a refresh
 - [ ] Two browser tabs side by side — a change in one shows up in the other (realtime works)
 - [ ] A file attached to a task downloads after a hard refresh (Cloudinary works)
+- [ ] `/health` shows `"payments": { "configured": true }`
+- [ ] Upgrading to Pro opens payOS, and paying flips the account to PRO without a refresh
 
 ---
 

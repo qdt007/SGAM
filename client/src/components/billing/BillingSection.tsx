@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { billingApi, formatVnd, BillingCycle, PlanDefinition } from '../../api/billingApi';
+import { billingApi, formatVnd, PROVIDER_NAME, BillingCycle, PlanDefinition } from '../../api/billingApi';
 import { planKeys, usePlan } from '../../hooks/usePlan';
 import { Modal } from '../ui/Modal';
 import { InlineError, Skeleton } from '../ui/States';
@@ -36,6 +36,7 @@ function CheckoutModal({ cycle, onClose }: { cycle: BillingCycle; onClose: () =>
   });
 
   const amount = session.data?.amount ?? 0;
+  const gateway = session.data ? PROVIDER_NAME[session.data.provider] : 'cổng thanh toán';
 
   return (
     <Modal
@@ -72,8 +73,8 @@ function CheckoutModal({ cycle, onClose }: { cycle: BillingCycle; onClose: () =>
           <div className="flex items-start gap-2 rounded-lg border border-line bg-sunken px-3 py-2.5 text-caption text-ink-muted">
             <Icon icon="ph:shield-check-fill" width={14} className="mt-px shrink-0 text-success" aria-hidden />
             <span>
-              Bạn sẽ được chuyển sang <b>VNPay</b> để thanh toán. Gói Pro chỉ được bật sau khi VNPay xác nhận, nên
-              đừng đóng trình duyệt giữa chừng.
+              Bạn sẽ được chuyển sang <b>{gateway}</b> để thanh toán. Gói Pro chỉ được bật sau khi {gateway} xác
+              nhận, nên đừng đóng trình duyệt giữa chừng.
             </span>
           </div>
         ) : (
@@ -105,7 +106,7 @@ function CheckoutModal({ cycle, onClose }: { cycle: BillingCycle; onClose: () =>
             className="btn-primary btn-sm"
           >
             {confirm.isPending && <Icon icon="ph:circle-notch" width={14} className="animate-spin" aria-hidden />}
-            {session.data?.paymentUrl ? 'Tới VNPay' : 'Thanh toán'} {session.data ? formatVnd(amount) : ''}
+            {session.data?.paymentUrl ? `Tới ${gateway}` : 'Thanh toán'} {session.data ? formatVnd(amount) : ''}
           </button>
         </div>
       </div>
@@ -182,8 +183,9 @@ export function BillingSection() {
   const [checkout, setCheckout] = useState<BillingCycle | null>(null);
   const [error, setError] = useState('');
 
-  // VNPay sends the customer back here with the outcome. The IPN is what actually grants Pro,
-  // and it can land a moment later, so a success with settled=0 says "processing", not "done".
+  // The gateway sends the customer back here with the outcome. The server-to-server callback is
+  // what actually grants Pro, and it can land a moment later, so a success with settled=0 says
+  // "processing", not "done".
   const paymentResult = searchParams.get('payment');
   const settled = searchParams.get('settled') === '1';
 
@@ -205,12 +207,14 @@ export function BillingSection() {
     paymentResult === 'success'
       ? settled
         ? { tone: 'success' as const, text: 'Thanh toán thành công. Gói Pro đã được kích hoạt.' }
-        : { tone: 'info' as const, text: 'VNPay đã nhận thanh toán. Đang chờ xác nhận, gói Pro sẽ bật trong giây lát.' }
-      : paymentResult === 'failed'
-        ? { tone: 'error' as const, text: 'Giao dịch không thành công hoặc đã bị huỷ. Bạn chưa bị trừ tiền.' }
-        : paymentResult === 'invalid'
-          ? { tone: 'error' as const, text: 'Không xác thực được phản hồi từ cổng thanh toán. Hãy thử lại.' }
-          : null;
+        : { tone: 'info' as const, text: 'Cổng thanh toán đã nhận tiền. Đang chờ xác nhận, gói Pro sẽ bật trong giây lát.' }
+      : paymentResult === 'cancelled'
+        ? { tone: 'info' as const, text: 'Bạn đã huỷ giao dịch. Không có khoản nào bị trừ.' }
+        : paymentResult === 'failed'
+          ? { tone: 'error' as const, text: 'Giao dịch không thành công. Bạn chưa bị trừ tiền.' }
+          : paymentResult === 'invalid'
+            ? { tone: 'error' as const, text: 'Không xác thực được phản hồi từ cổng thanh toán. Hãy thử lại.' }
+            : null;
   const { data: catalogue } = useQuery({ queryKey: planKeys.plans, queryFn: billingApi.plans });
 
   const cancel = useMutation({

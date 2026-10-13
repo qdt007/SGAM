@@ -19,6 +19,7 @@ import { taskTimeRouter, timeRouter } from './modules/timeTracking/timeTracking.
 import { taskFilesRouter, projectFilesRouter, filesRouter } from './modules/files/files.routes';
 import { allowedOrigins } from './config/cors';
 import { storageStatus } from './config/storage';
+import { payosStatus } from './config/payos';
 const app = express();
 // Render, Railway and friends terminate TLS in front of us. Without this express-rate-limit sees
 // the proxy's IP for every caller and buckets the whole internet together.
@@ -49,7 +50,12 @@ app.use('/api/files', filesRouter);
 // Reports file storage too: a deployment that cannot accept uploads should be visible here
 // rather than only when someone tries to change their profile picture.
 app.get('/health', (_req, res) =>
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), storage: storageStatus() }),
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    storage: storageStatus(),
+    payments: payosStatus(),
+  }),
 );
 app.use((_req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 app.use(errorHandler);

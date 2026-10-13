@@ -13,9 +13,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "ts-node --transpile-only prisma/seed.ts",
-    "seed:team": "ts-node --transpile-only prisma/seedTeam.ts"
+    "seed:team": "ts-node --transpile-only prisma/seedTeam.ts",
+    "payos:webhook": "ts-node --transpile-only scripts/payosWebhook.ts"
   },
   "dependencies": {
+    "@payos/node": "^2.0.5",
     "@prisma/client": "^5.10.0",
     "bcrypt": "^5.1.1",
     "bull": "^4.12.2",

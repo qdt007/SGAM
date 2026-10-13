@@ -9,8 +9,11 @@ const router = Router();
 // The catalogue is public so the pricing page renders before sign-in.
 router.get('/plans', ctrl.getPlans);
 
-// VNPay calls these without a session, so they must sit above the authenticate guard.
-// Neither trusts its input before the HMAC signature is verified.
+// The gateways call these without a session, so they must sit above the authenticate guard.
+// No handler trusts its input before the signature is verified, and only the two server-to-server
+// callbacks — payos/webhook and vnpay/ipn — can grant anything. The return URLs only report.
+router.post('/payos/webhook', ctrl.payosWebhook);
+router.get('/payos/return', ctrl.payosReturn);
 router.get('/vnpay/ipn', ctrl.vnpayIpn);
 router.get('/vnpay/return', ctrl.vnpayReturn);
 
