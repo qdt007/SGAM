@@ -14,26 +14,34 @@ import { Avatar } from '../ui/Avatar';
 
 /* ─── Brand mark ─────────────────────────────────── */
 /**
- * The real SGAM logo, not a drawn stand-in. It is a circle with its corners cut to transparent,
- * so it sits on a dark sidebar without a white square around it — which means the wrappers
- * around it must be round, never `rounded-lg`, or the ring gets clipped flat on four sides.
+ * The SGAM mark: the S with its cap, plane and book, on a transparent ground.
+ *
+ * The plate is only drawn in dark mode, and it is not decoration. Measured against the dark
+ * sidebar, 46% of the mark's pixels fall below 3:1 and 7.5% below 2:1 — that is not the
+ * shading going soft, it is half the logo disappearing. On light surfaces the same mark sits
+ * at 5.2:1 unaided, so a plate there would only be a box nobody asked for.
  *
  * `loading="eager"` because this is the first thing on the login screen; lazy-loading the brand
- * mark shows an empty box for the moment that matters most.
+ * mark shows an empty square for the moment that matters most.
  */
 function SgamLogo({ size = 32, className }: { size?: number; className?: string }) {
   return (
-    <img
-      src="/logo.png"
-      width={size}
-      height={size}
-      alt=""
-      aria-hidden
-      loading="eager"
-      decoding="async"
-      className={className}
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center rounded-[22%] dark:bg-white',
+        className,
+      )}
       style={{ width: size, height: size }}
-    />
+    >
+      <img
+        src="/logo.png"
+        alt=""
+        aria-hidden
+        loading="eager"
+        decoding="async"
+        className="h-full w-full object-contain dark:h-[82%] dark:w-[82%]"
+      />
+    </span>
   );
 }
 export { SgamLogo };

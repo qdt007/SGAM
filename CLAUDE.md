@@ -181,13 +181,23 @@ numbers are what make them legible), and never introduce a second y-axis.
 
 ## Brand mark
 
-`SgamLogo` in `components/layout/Layout.tsx` renders `/logo.png` — the real mark, a circle whose
-corners are cut to transparent so it sits on a dark sidebar without a white square behind it.
-**Wrappers around it must be round**, never `rounded-lg`, or the ring is clipped flat on four
-sides. All the icon sizes (`favicon.png`, `apple-touch-icon.png`, `icon-192`, `icon-512`, and the
-74 Android launcher files) are generated from `mobile/assets/icon.png`; regenerate the native set
-with `npx capacitor-assets generate --android` after changing it. iOS refuses an SVG
-`apple-touch-icon` and silently substitutes a screenshot of the page, so that one stays a PNG.
+`SgamLogo` in `components/layout/Layout.tsx` renders `/logo.png` — the S with its cap, plane and
+book, on a transparent ground.
+
+**The white plate behind it in dark mode is load-bearing, not decoration.** Measured against the
+dark sidebar, 46% of the mark's pixels fall below 3:1 and 7.5% below 2:1: that is half the logo
+vanishing, not its shading going soft. On light surfaces the same mark sits at 5.2:1 unaided, so
+the plate is `dark:` only — adding it in light mode would just be a box nobody asked for.
+
+The mark is portrait, so it is padded into a square before export; `SgamLogo` sets an explicit
+square width and height, and a non-square file would be stretched.
+
+Each icon gets a different safe margin, and they are not interchangeable: the in-app `logo.png`
+is transparent at 96% fill, `favicon.png` and `apple-touch-icon.png` carry their own white ground
+(a browser tab can be dark, and **iOS composites transparency onto black**), and the Android
+source at `mobile/assets/icon.png` sits at 60% because an adaptive icon is cropped hard. After
+changing the artwork, regenerate the 74 native files with
+`npx capacitor-assets generate --android`.
 
 ## In-flight work
 
