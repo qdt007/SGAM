@@ -39,11 +39,16 @@ export default {
         },
         hairline: { DEFAULT: themed('line'), soft: themed('line-soft') },
 
-        /* ── Terracotta: interactive only, never decoration ── */
+        /* ── Brand blue: interactive only, never decoration ──
+           The ramp is anchored at 600 = #0D69D8, the blue sampled from the logo, and its
+           luminance decreases monotonically from 50 to 900 so a tint never reads darker than
+           the shade above it. DEFAULT and hover come from the CSS variables instead, so they
+           follow the theme; these numbered steps do not and are only for the tinted chips and
+           borders that need a fixed value in both themes. */
         primary: {
-          50: '#FFF7ED', 100: '#FFEDD5', 200: '#FED7AA', 300: '#FDBA74',
-          400: '#FB923C', 500: '#EA580C', 600: '#C2410C', 700: '#9A3412',
-          800: '#7C2D12', 900: '#431407',
+          50: '#EFF6FF', 100: '#DBEAFE', 200: '#BFDBFE', 300: '#93C5FD',
+          400: '#60A5FA', 500: '#2F80ED', 600: '#0D69D8', 700: '#0B55B0',
+          800: '#09407F', 900: '#062A52',
           DEFAULT: themed('accent'),
           hover: themed('accent-hover'),
         },

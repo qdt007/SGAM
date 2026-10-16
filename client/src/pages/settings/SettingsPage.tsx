@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { User, Moon, Sun, Bell, Shield, Palette, ChevronRight } from 'lucide-react';
+import { User, Moon, Sun, Monitor, Bell, Shield, Palette, ChevronRight } from 'lucide-react';
 import { usersApi, NotificationPrefs } from '../../api/usersApi';
 import { authApi } from '../../api/authApi';
 import { Page, PageHeader } from '../../components/ui/Page';
@@ -199,8 +199,17 @@ function ProfileSection() {
   );
 }
 
+const THEME_CHOICES = [
+  { id: 'light' as const, label: 'Light Mode', icon: Sun },
+  { id: 'dark' as const, label: 'Dark Mode', icon: Moon },
+  { id: 'system' as const, label: 'System', icon: Monitor },
+];
+
 function AppearanceSection() {
-  const { theme, toggleTheme } = useUIStore();
+  const { theme, themeExplicit, setTheme, useSystemTheme } = useUIStore();
+  // "System" is a third state, not a third theme: it means no choice is in force, so the OS
+  // decides now and keeps deciding if it changes later.
+  const selected = themeExplicit ? theme : 'system';
 
   return (
     <div className="space-y-6">
@@ -212,22 +221,24 @@ function AppearanceSection() {
       <div className="space-y-4 mt-6 border-t border-line-soft pt-6">
         <div>
           <label className="label">Theme</label>
+          <p className="mt-0.5 text-caption text-ink-muted">
+            System follows your device, and keeps following it when you change that setting.
+          </p>
           <div className="flex gap-3 mt-1">
-            {(['light', 'dark'] as const).map((t) => (
+            {THEME_CHOICES.map(({ id, label, icon: Icon }) => (
               <button
-                key={t}
-                onClick={() => {
-                  if (theme !== t) toggleTheme();
-                }}
+                key={id}
+                onClick={() => (id === 'system' ? useSystemTheme() : setTheme(id))}
+                aria-pressed={selected === id}
                 className={cn(
                   'flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all',
-                  theme === t
+                  selected === id
                     ? 'border-primary bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
                     : 'border-line text-ink-muted hover:border-line-strong',
                 )}
               >
-                {t === 'light' ? <Sun size={15} /> : <Moon size={15} />}
-                {t.charAt(0).toUpperCase() + t.slice(1)} Mode
+                <Icon size={15} />
+                {label}
               </button>
             ))}
           </div>

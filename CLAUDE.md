@@ -171,6 +171,27 @@ In dark mode `--ink-on-accent` is near-black, not white. The accent has to be li
 as a link against the dark page, which leaves white text on it around 3.5:1 — the old terracotta
 theme failed exactly there.
 
+## Theme
+
+**The app follows the device until somebody picks a theme, and the picked one then outlives the
+device changing its mind.** `uiStore` keeps `themeExplicit` next to `theme` to tell those two
+apart, and `partializeUi` writes `theme` to storage **only when it is explicit** — persisting a
+value derived from the OS would freeze it, and the app would silently never follow the device
+again with nothing on screen to explain why. `useSystemTheme()` hands the decision back.
+
+`migrateUi` carries old installs across. Version 0 stored a theme with no way to say whether it
+was chosen, so it is inferred: the old default was light, which makes a stored `dark` deliberate
+and a stored `light` indistinguishable from untouched. Without that inference every existing
+install would stay pinned to light.
+
+`index.html` decides the class in an inline script **before React mounts**. The class is
+otherwise applied in an effect, so a device in dark mode paints a white screen first and flips —
+once per launch, on the slowest frame there is. That script mirrors the store's rule, so changing
+one means changing both.
+
+`src/__tests__/theme.test.ts` covers all of it; jsdom has no `matchMedia`, so the tests install
+one.
+
 ## Charts
 
 `components/reports/` renders its own inline SVG — no chart library. The two series are blue

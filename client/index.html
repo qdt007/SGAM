@@ -15,6 +15,19 @@
     <!-- iOS ignores an SVG apple-touch-icon and puts a screenshot of the page on the home
          screen instead, so this one has to be a PNG. 180px is what current iPhones ask for. -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <script>
+      /* Decide the theme before React mounts. The class is otherwise applied in an effect, so a
+         device in dark mode would paint a white screen first and flip — once per launch, on the
+         slowest frame there is. Mirrors uiStore: a saved explicit choice wins, the OS decides
+         otherwise. Wrapped because localStorage throws outright in some privacy modes. */
+      try {
+        var saved = JSON.parse(localStorage.getItem('ui-storage') || '{}').state || {};
+        var dark = saved.themeExplicit
+          ? saved.theme === 'dark'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
     <title>SGAM — Project Management</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
   </head>
