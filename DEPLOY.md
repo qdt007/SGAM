@@ -215,6 +215,27 @@ Close that terminal window afterwards. Those variables stay set until you do, an
 Re-running is safe: it deletes only the three projects and five accounts it created, and clears
 the previous run's files out of Cloudinary.
 
+### Dữ liệu demo cho buổi báo cáo
+
+`npm run seed:uni` tạo thêm 31 sinh viên của sáu trường đại học Đà Nẵng, 5 dự án có công việc,
+chat, khó khăn và lịch sử thanh toán. Mục đích là để các biểu đồ **có hình dạng**: trên database
+trắng thì biểu đồ đăng ký là một đường phẳng và ô doanh thu bằng 0, nhìn không biết nó có chạy hay
+không.
+
+Chạy lên database thật thì chỉ cần `DATABASE_URL`, không cần biến Cloudinary — seed này không tạo
+file nào:
+
+```powershell
+$env:DATABASE_URL="<Neon direct URL>"
+npm run seed:uni
+```
+
+Xoá sạch phần nó tạo ra: `npm run seed:uni -- --clean`.
+
+Dữ liệu là hư cấu; **chỉ tên miền trường là thật**. Vì vậy mọi tài khoản đều được tạo với
+`emailEnabled: false` — nếu không, một ngày nào đó cấu hình xong SMTP là ứng dụng gửi thư thật tới
+một địa chỉ `@udn.vn` không tồn tại.
+
 ---
 
 ## payOS (thanh toán thật)

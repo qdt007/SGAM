@@ -35,6 +35,13 @@ Demo data: `npm run seed` from `server/` (`prisma/seed.ts`). Its three attachmen
 `config/storage.ts` like any upload, so seeding a hosted database puts them in Cloudinary rather
 than on the seeding machine. It is re-runnable — it deletes only the three projects it owns by name and the notifications of the five accounts it creates, so hand-made data survives. Everything it writes is backdated so the burndown and the time logs have a real shape; if you add tasks to it, give them a `createdAt` near the project kickoff or the curve climbs instead of falling.
 
+A third seed, `npm run seed:uni` (`prisma/seedUniversities.ts`), adds 31 invented students from
+six Đà Nẵng universities plus five projects with tasks, chat, blockers and payments — it exists so
+the admin chart, the burndown and the revenue tile have a shape to show. It owns its five projects
+by name and its accounts by e-mail, deletes only those, and `-- --clean` removes them. The
+university domains are real while the addresses are not, so every account it creates has
+`emailEnabled: false`; without that, configuring SMTP would one day mail a real university.
+
 Tests: `npm test` in either package (Vitest; `npm run test:watch` to iterate). Server tests are pure logic plus supertest contract tests that never touch the database — keep it that way, since there is no separate test database.
 
 ## Architecture
