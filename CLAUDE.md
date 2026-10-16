@@ -154,10 +154,48 @@ on **Neon**, uploads on **Cloudinary**. Secrets live in the two dashboards; `.en
 - Existing code is written dense — short single-line stores, compact route tables. Match the file you're editing.
 - Icons: `lucide-react` on most pages, `@iconify/react` on the newer Apple-styled ones.
 
+## Colour
+
+**The palette comes from the logo, and `npm run check:contrast` is what keeps it honest.**
+`#0D69D8` is sampled from the middle of the wordmark's gradient; `#023AAB` is its darkest point
+and serves as the hover state. The neutrals are cool slate on purpose — this started as a warm
+terracotta/stone theme, and a cool accent on warm greys reads muddy, so changing the accent
+without changing the neutrals is the half-step that looks worse than either.
+
+`scripts/check-contrast.mjs` reads the tokens out of `index.css` and the series out of
+`BurndownChart.tsx`, so it cannot drift away from the code the way this file's description of the
+palette once did. Run it after any colour change; it fails the build-worthy checks and only warns
+on the judgement calls (hairlines, tritanopia on a one-hue palette).
+
+In dark mode `--ink-on-accent` is near-black, not white. The accent has to be light enough to read
+as a link against the dark page, which leaves white text on it around 3.5:1 — the old terracotta
+theme failed exactly there.
+
 ## Charts
 
-`components/reports/` renders its own inline SVG — no chart library. The series colors are validated for colorblind separation and surface contrast in both themes (light `#0066cc`/`#10b981`, dark `#3f8fe1`/`#1ea97c`). If you change them, re-validate rather than eyeballing, keep the value labels (the fills sit below 3:1 on the light surface, so the numbers are what make them legible), and never introduce a second y-axis.
+`components/reports/` renders its own inline SVG — no chart library. The two series are blue
+against grey (`remaining`/`ideal`) and blue against green (`open`/`done` in `WorkloadTable`), all
+checked for colourblind separation by the script above. If you change them, re-validate rather
+than eyeballing, keep the value labels (the fills sit below 3:1 on the light surface, so the
+numbers are what make them legible), and never introduce a second y-axis.
+
+## Brand mark
+
+`SgamLogo` in `components/layout/Layout.tsx` renders `/logo.png` — the real mark, a circle whose
+corners are cut to transparent so it sits on a dark sidebar without a white square behind it.
+**Wrappers around it must be round**, never `rounded-lg`, or the ring is clipped flat on four
+sides. All the icon sizes (`favicon.png`, `apple-touch-icon.png`, `icon-192`, `icon-512`, and the
+74 Android launcher files) are generated from `mobile/assets/icon.png`; regenerate the native set
+with `npx capacitor-assets generate --android` after changing it. iOS refuses an SVG
+`apple-touch-icon` and silently substitutes a screenshot of the page, so that one stays a PNG.
 
 ## In-flight work
 
-An Apple-inspired redesign is underway and uncommitted: `client/DESIGN.md` and `client/apple/DESIGN.md` hold the design tokens (Action Blue `#0066cc`, SF Pro Display, no chrome shadows), and `client/src/components/ui/` has the first three primitives — `DatePicker`, `SelectField`, `TimeDrum`. New UI should use these primitives and follow `client/DESIGN.md`.
+An Apple-inspired redesign is underway: `client/DESIGN.md` and `client/apple/DESIGN.md` hold its
+tokens (SF Pro Display, no chrome shadows) and `client/src/components/ui/` has the first three
+primitives — `DatePicker`, `SelectField`, `TimeDrum`. New UI should use these primitives and
+follow `client/DESIGN.md` for *layout and type*.
+
+**For colour, those documents are out of date** — they specify Action Blue `#0066cc` and warm
+neutrals, while the running theme is the logo blue `#0D69D8` on cool slate. Both files now carry
+a note saying so. Take colour from `index.css`, never from DESIGN.md.

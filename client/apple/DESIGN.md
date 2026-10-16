@@ -273,6 +273,12 @@ components:
     padding: 64px
 ---
 
+> **The live accent is `#0D69D8`, not the `#0066cc` written below.** That value is sampled from
+> the SGAM logo and is what `src/index.css` actually sets; this document predates the logo and
+> was never the running theme. Where the two disagree, `index.css` wins and
+> `npm run check:contrast` is the arbiter. The neutrals here are warm; the live ones are cool
+> slate, for the reason given in CLAUDE.md under "Colour".
+
 ## Overview
 
 Apple's web presence is a masterclass in **reverent product photography framed by near-invisible UI**. Every page is a stack of edge-to-edge product "tiles" — alternating light and dark canvases, each centered on a hero headline, a one-line tagline, two tiny blue pill CTAs, and an impossibly crisp product render. Nothing competes with the product. Typography is confident but quiet; color is either pure white, an off-white parchment, or a near-black tile; interactive elements are a single, quiet blue.

@@ -118,7 +118,7 @@ export function ProjectDetailPage() {
           <span className="flex min-w-0 items-center gap-2.5">
             <span
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
-              style={{ backgroundColor: project.coverColor || '#C2410C' }}
+              style={{ backgroundColor: project.coverColor || '#0D69D8' }}
               aria-hidden
             >
               {project.name[0].toUpperCase()}

@@ -70,9 +70,9 @@ export function GoogleCallbackPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-page p-4">
       <div className="w-full max-w-[400px] text-center">
-        <div className="mx-auto mb-5 h-14 w-14 overflow-hidden rounded-xl shadow-card">
-          <SgamLogo size={56} />
-        </div>
+        <div className="mx-auto mb-5 h-16 w-16">
+            <SgamLogo size={64} />
+          </div>
 
         {error ? (
           <>

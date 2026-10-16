@@ -6,7 +6,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { keys } from '../../constants/queryKeys';
 import { ConfirmDialog } from '../ui/Modal';
 
-const SWATCHES = ['#6366f1', '#0066cc', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#0891b2', '#78716c'];
+const SWATCHES = ['#6366f1', '#0D69D8', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#0891b2', '#64748b'];
 
 const apiMessage = (e: unknown, fallback: string) =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback;

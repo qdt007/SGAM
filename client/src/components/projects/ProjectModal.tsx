@@ -13,7 +13,7 @@ import { planLimitFrom } from '../../hooks/usePlan';
 import { cn } from '../../utils/cn';
 import { Project } from '../../types';
 
-const COVER_COLORS = ['#C2410C', '#9A3412', '#D97706', '#F59E0B', '#16A34A', '#0F766E', '#78716C', '#1C1917'];
+const COVER_COLORS = ['#0D69D8', '#023AAB', '#0F766E', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#475569'];
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),

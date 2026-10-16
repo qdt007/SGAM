@@ -3,10 +3,13 @@ import { format, parseISO } from 'date-fns';
 import { useUIStore } from '../../stores/uiStore';
 import { BurndownReport } from '../../types';
 
-/* Series colors validated for CVD separation and contrast against each surface. */
+/* Series colours validated for CVD separation and contrast against each surface by
+   `npm run check:contrast`. Re-run it rather than eyeballing if you change these.
+   `remaining` is the logo blue; `ideal` is a slate grey, so the pair stays separable for a
+   red-green colour-blind reader (deuteranopia distance 154 light, 95 dark). */
 const SERIES = {
-  light: { remaining: '#C2410C', ideal: '#A8A29E', grid: 'rgba(28,25,23,0.08)', ink: '#78716C' },
-  dark: { remaining: '#EA580C', ideal: '#78716C', grid: 'rgba(250,250,249,0.10)', ink: '#A8A29E' },
+  light: { remaining: '#0D69D8', ideal: '#94A3B8', grid: 'rgba(15,23,42,0.08)', ink: '#64748B' },
+  dark: { remaining: '#60A5FA', ideal: '#64748B', grid: 'rgba(248,250,252,0.10)', ink: '#94A3B8' },
 };
 
 const W = 720;
@@ -126,7 +129,7 @@ export function BurndownChart({ report }: { report: BurndownReport }) {
               cy={y(lastActual.remaining ?? 0)}
               r="4"
               fill={c.remaining}
-              stroke={theme === 'dark' ? '#292524' : '#ffffff'}
+              stroke={theme === 'dark' ? '#1E293B' : '#ffffff'}
               strokeWidth="2"
             />
           )}
@@ -140,7 +143,7 @@ export function BurndownChart({ report }: { report: BurndownReport }) {
                   cy={y(hovered.remaining)}
                   r="5"
                   fill={c.remaining}
-                  stroke={theme === 'dark' ? '#292524' : '#ffffff'}
+                  stroke={theme === 'dark' ? '#1E293B' : '#ffffff'}
                   strokeWidth="2"
                 />
               )}

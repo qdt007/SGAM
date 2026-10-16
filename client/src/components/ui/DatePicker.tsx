@@ -199,7 +199,7 @@ export function DatePicker({
           >
         {/* Apple-style calendar theme */}
         <style>{`
- .rdp { --rdp-cell-size:38px; --rdp-accent-color:#C2410C; --rdp-background-color:#FFEDD5; margin:0; }
+ .rdp { --rdp-cell-size:38px; --rdp-accent-color:#0D69D8; --rdp-background-color:#DBEAFE; margin:0; }
  .rdp-months { padding:14px 14px 8px; }
  .rdp-caption { padding:0 4px 10px; }
  .rdp-caption_label { font-weight:600; font-size:0.9rem; color:#1d1d1f; letter-spacing:-0.01em; }
@@ -209,10 +209,10 @@ export function DatePicker({
  .dark .rdp-day { color:#e8e8ea; }
  .rdp-day:hover:not(.rdp-day_selected) { background:#f0f0f0; }
  .dark .rdp-day:hover:not(.rdp-day_selected) { background:rgba(255,255,255,0.08); }
- .rdp-day_selected { background:#C2410C !important; color:#fff !important; font-weight:600; }
- .rdp-day_today:not(.rdp-day_selected) { color:#C2410C; font-weight:700; }
+ .rdp-day_selected { background:#0D69D8 !important; color:#fff !important; font-weight:600; }
+ .rdp-day_today:not(.rdp-day_selected) { color:#0D69D8; font-weight:700; }
  .rdp-day_outside { color:#c4c4c6 !important; }
- .rdp-nav_button { border-radius:8px !important; color:#C2410C; }
+ .rdp-nav_button { border-radius:8px !important; color:#0D69D8; }
  .rdp-nav_button:hover { background:#f0f0f0; }
  .dark .rdp-nav_button:hover { background:rgba(255,255,255,0.08); }
  `}</style>

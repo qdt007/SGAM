@@ -2,9 +2,9 @@ import { useId } from 'react';
 
 /**
  * Daily sign-ups over the window the API returns. Inline SVG rather than a chart library, and
- * the same two-series palette the reports use: #0066cc in light, #3f8fe1 in dark, both validated
- * for contrast. Every bar keeps its value label — the fill alone sits under 3:1 on this surface,
- * so the number is what makes it readable.
+ * the same blue the reports use: #0D69D8 in light, #60A5FA in dark, both taken from the logo and
+ * checked by `npm run check:contrast`. Every bar keeps its value label — the fill alone sits
+ * under 3:1 on this surface, so the number is what makes it readable.
  */
 export function SignupChart({ data }: { data: { date: string; count: number }[] }) {
   const gradientId = useId();
@@ -28,8 +28,8 @@ export function SignupChart({ data }: { data: { date: string; count: number }[] 
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" className="[stop-color:#0066cc] dark:[stop-color:#3f8fe1]" stopOpacity="0.95" />
-          <stop offset="100%" className="[stop-color:#0066cc] dark:[stop-color:#3f8fe1]" stopOpacity="0.55" />
+          <stop offset="0%" className="[stop-color:#0D69D8] dark:[stop-color:#60A5FA]" stopOpacity="0.95" />
+          <stop offset="100%" className="[stop-color:#0D69D8] dark:[stop-color:#60A5FA]" stopOpacity="0.55" />
         </linearGradient>
       </defs>
 

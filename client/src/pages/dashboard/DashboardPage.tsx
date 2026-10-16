@@ -106,7 +106,7 @@ export function DashboardPage() {
                   <Link key={project.id} to={`/projects/${project.id}`} className="list-row group">
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
-                      style={{ backgroundColor: project.coverColor || '#C2410C' }}
+                      style={{ backgroundColor: project.coverColor || '#0D69D8' }}
                       aria-hidden
                     >
                       {project.name[0].toUpperCase()}

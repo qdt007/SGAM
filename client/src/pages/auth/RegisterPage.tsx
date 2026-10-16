@@ -51,8 +51,8 @@ export function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-page p-4">
       <div className="w-full max-w-[400px]">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="mb-5 h-14 w-14 overflow-hidden rounded-xl shadow-card">
-            <SgamLogo size={56} />
+          <div className="mb-5 h-16 w-16">
+            <SgamLogo size={64} />
           </div>
           <h1 className="font-display text-section font-bold text-ink">Create your account</h1>
           <p className="mt-2 text-small text-ink-muted">Join SGAM and start collaborating</p>

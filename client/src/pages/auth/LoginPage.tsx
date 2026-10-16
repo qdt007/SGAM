@@ -77,8 +77,8 @@ export function LoginPage() {
       <div className="w-full max-w-[400px]">
         {/* Brand */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="mb-5 h-14 w-14 overflow-hidden rounded-xl shadow-card">
-            <SgamLogo size={56} />
+          <div className="mb-5 h-16 w-16">
+            <SgamLogo size={64} />
           </div>
           <h1 className="font-display text-section font-bold text-ink">Sign in to SGAM</h1>
           <p className="mt-2 text-small text-ink-muted">Manage your projects and track contributions</p>

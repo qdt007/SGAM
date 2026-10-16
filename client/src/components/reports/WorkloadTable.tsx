@@ -4,8 +4,9 @@ import { WorkloadReport } from '../../types';
 import { Avatar } from '../ui/Avatar';
 
 const SERIES = {
-  light: { open: '#C2410C', done: '#16A34A' },
-  dark: { open: '#EA580C', done: '#16A34A' },
+  // Blue against green: deuteranopia distance 90 light, 109 dark — checked, not eyeballed.
+  light: { open: '#0D69D8', done: '#16A34A' },
+  dark: { open: '#60A5FA', done: '#22C55E' },
 };
 
 /**

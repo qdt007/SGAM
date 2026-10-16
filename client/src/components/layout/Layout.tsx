@@ -13,37 +13,27 @@ import { usePlan } from '../../hooks/usePlan';
 import { Avatar } from '../ui/Avatar';
 
 /* ─── Brand mark ─────────────────────────────────── */
-function SgamLogo({ size = 32 }: { size?: number }) {
+/**
+ * The real SGAM logo, not a drawn stand-in. It is a circle with its corners cut to transparent,
+ * so it sits on a dark sidebar without a white square around it — which means the wrappers
+ * around it must be round, never `rounded-lg`, or the ring gets clipped flat on four sides.
+ *
+ * `loading="eager"` because this is the first thing on the login screen; lazy-loading the brand
+ * mark shows an empty box for the moment that matters most.
+ */
+function SgamLogo({ size = 32, className }: { size?: number; className?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <defs>
-        <linearGradient id="sgam-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#C2410C" />
-          <stop offset="100%" stopColor="#9A3412" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="8" fill="url(#sgam-grad)" />
-      <circle cx="16" cy="11.5" r="3.5" fill="white" />
-      <circle cx="9" cy="14.5" r="2.5" fill="white" opacity="0.7" />
-      <circle cx="23" cy="14.5" r="2.5" fill="white" opacity="0.7" />
-      <path d="M8 27c0-4.4 3.6-8 8-8s8 3.6 8 8" fill="white" />
-      <path
-        d="M2 27c0-3 2.2-5.5 5-5.5"
-        stroke="white"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        fill="none"
-        opacity="0.55"
-      />
-      <path
-        d="M30 27c0-3-2.2-5.5-5-5.5"
-        stroke="white"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        fill="none"
-        opacity="0.55"
-      />
-    </svg>
+    <img
+      src="/logo.png"
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden
+      loading="eager"
+      decoding="async"
+      className={className}
+      style={{ width: size, height: size }}
+    />
   );
 }
 export { SgamLogo };
@@ -207,7 +197,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex h-full flex-col bg-surface">
         <div className={cn('flex h-14 items-center gap-2 px-3', isCollapsed && 'justify-center px-0')}>
-          <span className="shrink-0 overflow-hidden rounded-lg">
+          <span className="shrink-0">
             <SgamLogo size={28} />
           </span>
           {!isCollapsed && <span className="truncate text-md font-semibold tracking-tight text-ink">SGAM</span>}
