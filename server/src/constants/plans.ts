@@ -61,7 +61,7 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
     name: 'Pro',
     tagline: 'Cho nhóm chạy nhiều dự án cùng lúc',
     priceMonthly: 49000,
-    priceYearly: 299000,
+    priceYearly: 499000,
     limits: {
       maxOwnedProjects: null,
       maxMembersPerProject: null,
