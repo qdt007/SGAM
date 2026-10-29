@@ -40,8 +40,16 @@ function backToBilling(res: Response, status: string, settled: boolean) {
  * Server-to-server callback from payOS. Unauthenticated by necessity — payOS has no session —
  * and safe because the service verifies the payload's signature before reading anything from it.
  *
- * A bad signature is the one case that must not answer 2xx: payOS would take that as delivered
- * and stop retrying, and a request that fails the check did not come from payOS anyway.
+ * **A payload that fails verification is acknowledged with 200 and acted on in no way.** This
+ * used to answer 401, on the reasoning that 2xx would make payOS treat it as delivered and stop
+ * retrying. That reasoning was wrong: a request that fails the signature check did not come from
+ * payOS, so there is no delivery for payOS to retry. What it did break was registration — payOS
+ * probes the URL when you save it and refuses the whole webhook if the probe is not 2xx, which
+ * is exactly the 401 it reported back.
+ *
+ * The cost of answering 200 is that a wrong checksum key would silently swallow real payments
+ * instead of making payOS retry, so a failure is logged loudly rather than passed over in
+ * silence. A payment that never activates Pro is the visible symptom either way.
  */
 export const payosWebhook = asyncHandler(async (req: Request, res: Response) => {
   try {
@@ -49,10 +57,20 @@ export const payosWebhook = asyncHandler(async (req: Request, res: Response) => 
   } catch (err) {
     // A server with no payOS credentials cannot judge a signature either way, and answering
     // "invalid signature" to that would send whoever is debugging it after the wrong fault.
-    const unconfigured = (err as { status?: number })?.status === 503;
-    res
-      .status(unconfigured ? 503 : 401)
-      .json({ success: false, message: unconfigured ? 'payOS is not configured' : 'Invalid signature' });
+    if ((err as { status?: number })?.status === 503) {
+      res.status(503).json({ success: false, message: 'payOS is not configured' });
+      return;
+    }
+    const body = req.body as { data?: { orderCode?: unknown } } | undefined;
+    console.warn(
+      '[payOS] webhook failed verification, ignoring:',
+      (err as Error)?.message ?? err,
+      '| orderCode:',
+      body?.data?.orderCode ?? '(none)',
+      '| keys:',
+      Object.keys(body ?? {}).join(','),
+    );
+    res.json({ success: true, message: 'Acknowledged, not processed' });
   }
 });
 

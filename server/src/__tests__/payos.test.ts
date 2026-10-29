@@ -79,14 +79,16 @@ describe('activeProvider', () => {
 });
 
 describe('payOS callback routes', () => {
-  it('rejects a webhook that is not signed with our checksum key', async () => {
+  it('acknowledges a webhook that is not signed with our checksum key, without acting on it', async () => {
     setPayos();
     const res = await request(app)
       .post('/api/billing/payos/webhook')
       .send({ code: '00', desc: 'success', success: true, data: { orderCode: 123 }, signature: 'forged' });
-    // Not 2xx on purpose: payOS treats 2xx as delivered and stops retrying, and a payload that
-    // fails the signature check did not come from payOS in the first place.
-    expect(res.status).toBe(401);
+    // 200 on purpose. This answered 401 once and payOS refused to register the URL at all — it
+    // probes the endpoint on save and wants 2xx. There is nothing lost by acknowledging: a
+    // payload that fails the check did not come from payOS, so no delivery is being dropped.
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/not processed/i);
   });
 
   it('says so when payOS is not configured instead of blaming the signature', async () => {

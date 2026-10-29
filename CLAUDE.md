@@ -112,9 +112,12 @@ Things worth knowing before you change them:
 - **Only the server-to-server callback grants Pro** — `POST /api/billing/payos/webhook` for
   payOS, `GET /api/billing/vnpay/ipn` for VNPay. Both are unauthenticated by necessity (neither
   gateway has a session) and neither trusts anything before the signature verifies. The browser
-  return URLs only report. The payOS webhook answers 2xx for everything it has handled —
-  including a transaction that is not ours, since payOS posts a sample one to register the URL —
-  but 401 on a bad signature, because 2xx would stop it retrying.
+  return URLs only report. **The payOS webhook answers 2xx for
+  everything, including a payload whose signature does not verify** — it logs that and acts on it
+  in no way. It answered 401 once, on the reasoning that 2xx would stop payOS retrying; that was
+  wrong, because a payload failing the check is not from payOS and there is no delivery to retry.
+  What the 401 did do was make payOS refuse to register the URL at all: it probes the endpoint
+  when you save it and rejects anything that is not 2xx.
 - **`config/vnpay.ts` reproduces VNPay's signing byte for byte.** It is not "URL-encode the
   query": keys are encoded then sorted, values encoded with `%20` rewritten to `+`, joined
   without re-encoding. `URLSearchParams` escapes `!'()*` differently and every difference comes
