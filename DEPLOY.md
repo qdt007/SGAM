@@ -238,6 +238,36 @@ một địa chỉ `@udn.vn` không tồn tại.
 
 ---
 
+## Khi deploy chết vì "advisory lock"
+
+```
+Error: P1002 ... Timed out trying to acquire a postgres advisory lock
+```
+
+`startCommand` chạy `prisma migrate deploy` trước khi mở server, và migration cần một
+**advisory lock** của Postgres. Lock đó gắn với *phiên* kết nối, mà endpoint `-pooler` của Neon là
+PgBouncer chạy chế độ transaction — hai câu lệnh liên tiếp không chắc rơi vào cùng một kết nối
+thật. Migration ngồi chờ lock rồi hết giờ, và service **chết trước khi kịp khởi động**.
+
+Vì vậy Prisma có `directUrl`: ứng dụng vẫn dùng chuỗi pooled, riêng migration đi đường trực tiếp.
+
+**Trên Render → Environment**, thêm biến `DIRECT_URL` = đúng chuỗi `DATABASE_URL` nhưng **bỏ
+`-pooler`** khỏi tên host:
+
+```
+DATABASE_URL = postgresql://...@ep-abc-xyz-pooler.c-10.us-east-1.aws.neon.tech/neondb?sslmode=require
+DIRECT_URL   = postgresql://...@ep-abc-xyz.c-10.us-east-1.aws.neon.tech/neondb?sslmode=require
+                                           ^^^ chi khac cho nay
+```
+
+Neon cũng cho sẵn cả hai chuỗi trong mục **Connection string** của dashboard — chọn *Direct
+connection* thay vì *Pooled connection*.
+
+Lỗi này hay xuất hiện sau khi database vừa ngủ dậy, nên nó có vẻ lúc được lúc không. Nguyên nhân
+thì cố định; cái thay đổi chỉ là nó có kịp quá 10 giây hay không.
+
+---
+
 ## payOS (thanh toán thật)
 
 Cổng chính. Checkout chọn nhà cung cấp theo biến môi trường nào có mặt: **payOS → VNPay → mô

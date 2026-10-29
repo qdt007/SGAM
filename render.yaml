@@ -26,6 +26,11 @@ services:
         value: cloudinary
       - key: DATABASE_URL
         sync: false # Neon pooled connection string, with ?sslmode=require
+      - key: DIRECT_URL
+        # The same Neon string with `-pooler` removed from the host. Migrations need a real
+        # session to hold their advisory lock; through the pooler they time out and the deploy
+        # fails before the server ever starts.
+        sync: false
       - key: CLIENT_URL
         sync: false # https://<your-app>.vercel.app — no trailing slash, comma-separate extra domains
       - key: JWT_ACCESS_SECRET

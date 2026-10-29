@@ -152,6 +152,14 @@ Things worth knowing before you change them:
 
 ## Deploying
 
+**`schema.prisma` declares `directUrl` and it is not optional on Neon.** `startCommand` runs
+`prisma migrate deploy` before the server opens, migrations take a session-scoped Postgres
+advisory lock, and Neon's `-pooler` host is PgBouncer in transaction mode where the session is
+not stable. The lock times out, the deploy fails, and the service never starts. `DIRECT_URL` is
+the same connection string with `-pooler` removed; the app keeps using the pooled one. Because
+the database sleeps on the free tier, this looks intermittent — only whether it beats the 10s
+timeout varies, not the cause.
+
 `DEPLOY.md` is the step-by-step. Shape: client on **Vercel** (static, `client/vercel.json`), API on
 **Render** (`render.yaml`, always-on Node — Socket.io and `node-cron` rule out serverless), Postgres
 on **Neon**, uploads on **Cloudinary**. Secrets live in the two dashboards; `.env` stays gitignored.
