@@ -244,27 +244,24 @@ một địa chỉ `@udn.vn` không tồn tại.
 Error: P1002 ... Timed out trying to acquire a postgres advisory lock
 ```
 
-`startCommand` chạy `prisma migrate deploy` trước khi mở server, và migration cần một
-**advisory lock** của Postgres. Lock đó gắn với *phiên* kết nối, mà endpoint `-pooler` của Neon là
-PgBouncer chạy chế độ transaction — hai câu lệnh liên tiếp không chắc rơi vào cùng một kết nối
-thật. Migration ngồi chờ lock rồi hết giờ, và service **chết trước khi kịp khởi động**.
+`startCommand` chạy `prisma migrate deploy` trước khi mở server, và migration cần một advisory
+lock của Postgres. Trên Neon free tier, database **ngủ sau vài phút không ai dùng**; lần kết nối
+đầu tiên mất gần một phút để đánh thức, và lock chỉ chờ 10 giây.
 
-Vì vậy Prisma có `directUrl`: ứng dụng vẫn dùng chuỗi pooled, riêng migration đi đường trực tiếp.
+**Thử lại trước đã.** Mở `/health` cho database thức dậy, rồi bấm **Manual Deploy → Deploy latest
+commit** trên Render. Phần lớn trường hợp là xong — lỗi này nhất thời chứ không cố định, vì
+migration vẫn chạy được qua chuỗi pooled trong mọi lần deploy khác.
 
-**Trên Render → Environment**, thêm biến `DIRECT_URL` = đúng chuỗi `DATABASE_URL` nhưng **bỏ
-`-pooler`** khỏi tên host:
+**Nếu nó lặp lại đều đặn** thì mới đụng tới cấu hình, và cách đúng là cho migration một kết nối
+không qua pooler:
 
-```
-DATABASE_URL = postgresql://...@ep-abc-xyz-pooler.c-10.us-east-1.aws.neon.tech/neondb?sslmode=require
-DIRECT_URL   = postgresql://...@ep-abc-xyz.c-10.us-east-1.aws.neon.tech/neondb?sslmode=require
-                                           ^^^ chi khac cho nay
-```
+1. Thêm vào `schema.prisma`, trong khối `datasource`: `directUrl = env("DIRECT_URL")`
+2. Trên Render thêm biến `DIRECT_URL` = đúng chuỗi `DATABASE_URL` nhưng **bỏ `-pooler`** khỏi host
 
-Neon cũng cho sẵn cả hai chuỗi trong mục **Connection string** của dashboard — chọn *Direct
-connection* thay vì *Pooled connection*.
-
-Lỗi này hay xuất hiện sau khi database vừa ngủ dậy, nên nó có vẻ lúc được lúc không. Nguyên nhân
-thì cố định; cái thay đổi chỉ là nó có kịp quá 10 giây hay không.
+Cẩn thận: khai `directUrl` rồi thì biến đó **bắt buộc phải đúng**. Để trống hoặc dính dấu nháy
+là **mọi** lần deploy chết với `P1013: The scheme is not recognized`, kể cả khi không có
+migration nào cần chạy. Lúc đó bạn đổi một lỗi thỉnh thoảng lấy một lỗi vĩnh viễn — đã xảy ra
+đúng như vậy một lần trong dự án này.
 
 ---
 

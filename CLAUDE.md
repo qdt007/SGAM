@@ -152,13 +152,13 @@ Things worth knowing before you change them:
 
 ## Deploying
 
-**`schema.prisma` declares `directUrl` and it is not optional on Neon.** `startCommand` runs
-`prisma migrate deploy` before the server opens, migrations take a session-scoped Postgres
-advisory lock, and Neon's `-pooler` host is PgBouncer in transaction mode where the session is
-not stable. The lock times out, the deploy fails, and the service never starts. `DIRECT_URL` is
-the same connection string with `-pooler` removed; the app keeps using the pooled one. Because
-the database sleeps on the free tier, this looks intermittent — only whether it beats the 10s
-timeout varies, not the cause.
+**`startCommand` runs `prisma migrate deploy` before the server opens, so a migration that
+cannot start means no server at all.** On Neon's free tier the database sleeps, and a cold wake
+can outlast the 10s advisory-lock timeout — `P1002`. It is transient: retry the deploy once the
+database is awake. Do **not** reach for `directUrl` first. Declaring it makes `DIRECT_URL`
+mandatory, and an empty or quoted value then fails *every* deploy with `P1013` even when no
+migration is pending — trading an occasional failure for a permanent one, which is exactly what
+happened here once. DEPLOY.md has the remedy for when the timeout is genuinely repeatable.
 
 `DEPLOY.md` is the step-by-step. Shape: client on **Vercel** (static, `client/vercel.json`), API on
 **Render** (`render.yaml`, always-on Node — Socket.io and `node-cron` rule out serverless), Postgres

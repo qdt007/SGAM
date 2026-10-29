@@ -5,12 +5,11 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  /// Migrations take a Postgres advisory lock, and an advisory lock is session-scoped. Neon's
-  /// `-pooler` endpoint is PgBouncer in transaction mode, where a session is not guaranteed to
-  /// be the same backend twice, so `migrate deploy` can sit there until it times out:
-  /// "Timed out trying to acquire a postgres advisory lock". Point this at the Neon URL
-  /// *without* `-pooler`; the app itself keeps using the pooled one.
-  directUrl = env("DIRECT_URL")
+  /// No `directUrl` on purpose. It was added once to dodge a P1002 advisory-lock timeout and
+  /// turned a transient failure into a permanent one — a DIRECT_URL that is empty or carries a
+  /// stray quote fails every deploy with P1013 before the server ever starts, where the thing
+  /// it was meant to fix only happened on a cold database. DEPLOY.md keeps the remedy for the
+  /// day the timeout is real and repeatable.
 }
 
 enum GlobalRole {
