@@ -1,18 +1,23 @@
 /**
- * Demo population: students from six Đà Nẵng universities, with projects that look lived in.
+ * Demo population: a small cohort of Đà Nẵng students with projects that look lived in.
  *
  * This exists so the dashboards have something to show — the admin sign-up chart, the burndown,
  * the workload table and the revenue tile all read as flat or empty on a fresh database, which
- * tells a viewer nothing about whether they work.
+ * tells a viewer nothing about whether they work. It also exercises the parts of the app that a
+ * screenshot cannot fake: chat with real @mentions, task comments, tags, subtasks, logged time,
+ * blockers both open and resolved.
  *
- * **Everything here is invented.** The names, the projects and the work are fiction; only the
- * university domains are real, and that is the one thing worth being careful about. These
- * addresses do not belong to anybody, but they are shaped exactly like addresses that do, so
- * every account created here has `emailEnabled: false` on its notification preferences. Without
- * that, one configured SMTP server and one @due.udn.vn notification is the app mailing a real
- * university about a project that does not exist.
+ * **The writing is deliberately informal.** Students do not file tickets in full sentences, and
+ * a board where every comment reads like a press release is the clearest sign the data is
+ * invented. The chat and comments here use the abbreviations people actually type.
  *
- * Re-runnable. It owns its five projects by name and its accounts by the e-mail list below, and
+ * **Everything is fiction except the university domains**, and that is the one thing worth being
+ * careful about. These addresses belong to nobody, but they are shaped exactly like addresses
+ * that do, so every account is created with `emailEnabled: false`. Without that, one configured
+ * SMTP server and one notification is this app mailing a real university about a project that
+ * does not exist.
+ *
+ * Re-runnable. It owns its projects by name and its accounts by the e-mail list below, and
  * deletes only those — `seed.ts`, `seedTeam.ts` and anything you made by hand are untouched.
  *
  * Run:    npm run seed:uni
@@ -38,103 +43,63 @@ const prisma = new PrismaClient();
 const PASSWORD = process.env.SEED_PASSWORD ?? 'Sinhvien2026!';
 
 const DAY = 24 * 60 * 60 * 1000;
-const daysAgo = (n: number, hour = 10) => {
+const daysAgo = (n: number, hour = 10, minute?: number) => {
   const d = new Date(Date.now() - n * DAY);
-  d.setHours(hour, Math.floor((n * 37) % 60), 0, 0);
+  d.setHours(hour, minute ?? Math.floor((n * 37) % 60), 0, 0);
   return d;
 };
 const daysAhead = (n: number, hour = 17) => daysAgo(-n, hour);
 
 /* ─── Universities ───────────────────────────────────────── */
 
-interface Uni {
-  key: string;
-  name: string;
-  short: string;
-  domain: string;
-}
+const UNIS = [
+  { key: 'dtu', short: 'DTU', domain: 'dtu.edu.vn' },
+  { key: 'due', short: 'DUE', domain: 'due.udn.vn' },
+  { key: 'dut', short: 'DUT', domain: 'dut.udn.vn' },
+  { key: 'vku', short: 'VKU', domain: 'vku.udn.vn' },
+] as const;
 
-const UNIS: Uni[] = [
-  { key: 'dtu', name: 'Đại học Duy Tân', short: 'DTU', domain: 'dtu.edu.vn' },
-  { key: 'due', name: 'Trường ĐH Kinh tế — ĐH Đà Nẵng', short: 'DUE', domain: 'due.udn.vn' },
-  { key: 'dut', name: 'Trường ĐH Bách khoa — ĐH Đà Nẵng', short: 'DUT', domain: 'dut.udn.vn' },
-  { key: 'vku', name: 'Trường ĐH CNTT&TT Việt — Hàn', short: 'VKU', domain: 'vku.udn.vn' },
-  { key: 'ued', name: 'Trường ĐH Sư phạm — ĐH Đà Nẵng', short: 'UED', domain: 'ued.udn.vn' },
-  { key: 'donga', name: 'Đại học Đông Á', short: 'ĐÔNG Á', domain: 'donga.edu.vn' },
-];
-
-const uni = Object.fromEntries(UNIS.map((u) => [u.key, u])) as Record<string, Uni>;
+type UniKey = (typeof UNIS)[number]['key'];
+const domainOf = Object.fromEntries(UNIS.map((u) => [u.key, u.domain])) as Record<UniKey, string>;
 
 /* ─── Students ───────────────────────────────────────────── */
 
 interface Student {
-  /** Local part of the e-mail, and the @handle. */
+  /** Local part of the e-mail, and the @handle people type in chat. */
   id: string;
   name: string;
-  uni: string;
-  /** How many days ago they signed up. Spread across the chart's 14-day window on purpose. */
+  uni: UniKey;
+  /** Days ago they signed up. Spread across the chart's 14-day window on purpose. */
   joined: number;
-  /** Null leaves them on Free — a campus where everyone pays is not a believable one. */
+  /** Absent leaves them on Free — a campus where everyone pays is not a believable one. */
   pro?: { cycle: BillingCycle; boughtDaysAgo: number; renewals?: number };
 }
 
 const STUDENTS: Student[] = [
-  // Duy Tân
   { id: 'nguyenvanhoang', name: 'Nguyễn Văn Hoàng', uni: 'dtu', joined: 13, pro: { cycle: 'YEARLY', boughtDaysAgo: 12 } },
   { id: 'tranthimyduyen', name: 'Trần Thị Mỹ Duyên', uni: 'dtu', joined: 13 },
   { id: 'lequangthinh', name: 'Lê Quang Thịnh', uni: 'dtu', joined: 12, pro: { cycle: 'MONTHLY', boughtDaysAgo: 9, renewals: 2 } },
   { id: 'phamthinhan', name: 'Phạm Thị Nhàn', uni: 'dtu', joined: 11 },
-  { id: 'vothanhdat', name: 'Võ Thành Đạt', uni: 'dtu', joined: 10 },
-  { id: 'dangngocmai', name: 'Đặng Ngọc Mai', uni: 'dtu', joined: 8 },
 
-  // Kinh tế
   { id: 'buihoangnam', name: 'Bùi Hoàng Nam', uni: 'due', joined: 12, pro: { cycle: 'MONTHLY', boughtDaysAgo: 5 } },
-  { id: 'nguyenthulinh', name: 'Nguyễn Thu Linh', uni: 'due', joined: 11 },
-  { id: 'hoangminhtri', name: 'Hoàng Minh Trí', uni: 'due', joined: 10 },
-  { id: 'truongthiha', name: 'Trương Thị Hà', uni: 'due', joined: 9, pro: { cycle: 'YEARLY', boughtDaysAgo: 7 } },
-  { id: 'dinhvanphuc', name: 'Đinh Văn Phúc', uni: 'due', joined: 7 },
-  { id: 'lythikimanh', name: 'Lý Thị Kim Anh', uni: 'due', joined: 6 },
-  { id: 'nguyenbaolong', name: 'Nguyễn Bảo Long', uni: 'due', joined: 4 },
+  { id: 'nguyenthulinh', name: 'Nguyễn Thu Linh', uni: 'due', joined: 10 },
+  { id: 'hoangminhtri', name: 'Hoàng Minh Trí', uni: 'due', joined: 9 },
+  { id: 'truongthiha', name: 'Trương Thị Hà', uni: 'due', joined: 8, pro: { cycle: 'YEARLY', boughtDaysAgo: 7 } },
 
-  // Bách khoa
   { id: 'phanducmanh', name: 'Phan Đức Mạnh', uni: 'dut', joined: 11 },
-  { id: 'hothikieutrang', name: 'Hồ Thị Kiều Trang', uni: 'dut', joined: 9 },
-  { id: 'nguyenhuuthang', name: 'Nguyễn Hữu Thắng', uni: 'dut', joined: 8, pro: { cycle: 'MONTHLY', boughtDaysAgo: 3 } },
-  { id: 'caothiphuonguyen', name: 'Cao Thị Phương Uyên', uni: 'dut', joined: 6 },
+  { id: 'hothikieutrang', name: 'Hồ Thị Kiều Trang', uni: 'dut', joined: 7 },
+  { id: 'nguyenhuuthang', name: 'Nguyễn Hữu Thắng', uni: 'dut', joined: 6, pro: { cycle: 'MONTHLY', boughtDaysAgo: 3 } },
   { id: 'tranminhkhoa', name: 'Trần Minh Khoa', uni: 'dut', joined: 5 },
 
-  // VKU
-  { id: 'nguyentuananh', name: 'Nguyễn Tuấn Anh', uni: 'vku', joined: 10 },
-  { id: 'dothihongnhung', name: 'Đỗ Thị Hồng Nhung', uni: 'vku', joined: 8 },
-  { id: 'lethanhtung', name: 'Lê Thanh Tùng', uni: 'vku', joined: 7, pro: { cycle: 'YEARLY', boughtDaysAgo: 6 } },
-  { id: 'vuthimylinh', name: 'Vũ Thị Mỹ Linh', uni: 'vku', joined: 5 },
-  { id: 'nguyendinhquan', name: 'Nguyễn Đình Quân', uni: 'vku', joined: 3 },
-
-  // Sư phạm
-  { id: 'trinhthuthao', name: 'Trịnh Thu Thảo', uni: 'ued', joined: 7 },
-  { id: 'nguyenvanloc', name: 'Nguyễn Văn Lộc', uni: 'ued', joined: 5 },
-  { id: 'phamthihongtham', name: 'Phạm Thị Hồng Thắm', uni: 'ued', joined: 3 },
-  { id: 'dangquochuy', name: 'Đặng Quốc Huy', uni: 'ued', joined: 2 },
-
-  // Đông Á
-  { id: 'ngothikimngan', name: 'Ngô Thị Kim Ngân', uni: 'donga', joined: 4 },
-  { id: 'huynhvantai', name: 'Huỳnh Văn Tài', uni: 'donga', joined: 2, pro: { cycle: 'MONTHLY', boughtDaysAgo: 1 } },
-  { id: 'nguyenthanhvinh', name: 'Nguyễn Thanh Vinh', uni: 'donga', joined: 1 },
-  { id: 'lethiyennhi', name: 'Lê Thị Yến Nhi', uni: 'donga', joined: 0 },
+  { id: 'nguyentuananh', name: 'Nguyễn Tuấn Anh', uni: 'vku', joined: 4 },
+  { id: 'dothihongnhung', name: 'Đỗ Thị Hồng Nhung', uni: 'vku', joined: 2 },
+  { id: 'lethanhtung', name: 'Lê Thanh Tùng', uni: 'vku', joined: 0 },
 ];
 
-const emailOf = (s: Student) => `${s.id}@${uni[s.uni].domain}`;
+const emailOf = (s: Student) => `${s.id}@${domainOf[s.uni]}`;
 const SEED_EMAILS = STUDENTS.map(emailOf);
 
-/* ─── Projects ───────────────────────────────────────────── */
-
-const SEED_PROJECTS = [
-  'Khởi nghiệp: Ứng dụng đặt lịch gia sư',
-  'Nghiên cứu hành vi tiêu dùng Gen Z Đà Nẵng',
-  'Đồ án tốt nghiệp — Hệ thống IoT nông nghiệp',
-  'CLB Lập trình VKU — Mùa hè xanh 2026',
-  'Chiến dịch truyền thông Ngày hội việc làm',
-];
+/* ─── Shape of a project ─────────────────────────────────── */
 
 const COLUMNS = [
   { name: 'Backlog', order: 0, color: '#64748b' },
@@ -143,6 +108,22 @@ const COLUMNS = [
   { name: 'Đang duyệt', order: 3, color: '#8b5cf6' },
   { name: 'Xong', order: 4, color: '#16a34a' },
 ];
+
+/** Tag names are unique table-wide, so these are shared across projects by design. */
+const TAGS: Record<string, string> = {
+  'Thiết kế': '#8b5cf6',
+  'Lập trình': '#0D69D8',
+  'Khảo sát': '#0F766E',
+  'Báo cáo': '#D97706',
+  'Gấp': '#DC2626',
+  'Phần cứng': '#475569',
+};
+
+interface CommentSeed {
+  from: string;
+  body: string;
+  daysAgo: number;
+}
 
 interface TaskSeed {
   title: string;
@@ -154,8 +135,12 @@ interface TaskSeed {
   dueInDays?: number;
   doneDaysAgo?: number;
   estimatedHrs?: number;
-  /** Minutes logged, by whoever is assigned. */
+  /** Minutes per logged session, by whoever is assigned. */
   logged?: number[];
+  tags?: string[];
+  /** Checklist items inside the task. Reports count top-level tasks only, so these never skew it. */
+  subtasks?: { title: string; done?: boolean }[];
+  comments?: CommentSeed[];
 }
 
 interface ProjectSeed {
@@ -165,6 +150,7 @@ interface ProjectSeed {
   startedDaysAgo: number;
   owner: string;
   members: { id: string; role: ProjectRole }[];
+  tags: string[];
   tasks: TaskSeed[];
   chat: { from: string; body: string; daysAgo: number; pinned?: boolean }[];
   blockers: {
@@ -179,8 +165,8 @@ interface ProjectSeed {
 
 const PROJECTS: ProjectSeed[] = [
   {
-    name: SEED_PROJECTS[0],
-    description: 'Sản phẩm môn Khởi nghiệp — ứng dụng kết nối gia sư với phụ huynh tại Đà Nẵng.',
+    name: 'Khởi nghiệp: App đặt lịch gia sư',
+    description: 'Môn Khởi nghiệp — app kết nối gia sư với phụ huynh ở Đà Nẵng. Deadline bảo vệ cuối tháng.',
     coverColor: '#0D69D8',
     startedDaysAgo: 13,
     owner: 'nguyenvanhoang',
@@ -189,89 +175,215 @@ const PROJECTS: ProjectSeed[] = [
       { id: 'tranthimyduyen', role: ProjectRole.MANAGER },
       { id: 'lequangthinh', role: ProjectRole.MEMBER },
       { id: 'phamthinhan', role: ProjectRole.MEMBER },
-      { id: 'vothanhdat', role: ProjectRole.MEMBER },
-      { id: 'dangngocmai', role: ProjectRole.VIEWER },
+      { id: 'nguyenthulinh', role: ProjectRole.MEMBER },
+      { id: 'lethanhtung', role: ProjectRole.VIEWER },
     ],
+    tags: ['Thiết kế', 'Lập trình', 'Khảo sát', 'Gấp'],
     tasks: [
-      { title: 'Khảo sát 50 phụ huynh quận Hải Châu', column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'tranthimyduyen', createdDaysAgo: 13, doneDaysAgo: 9, estimatedHrs: 12, logged: [180, 240, 150] },
-      { title: 'Phân tích đối thủ: Tutor.vn, Kyna', column: 'Xong', status: 'DONE', priority: 'MEDIUM', assignee: 'lequangthinh', createdDaysAgo: 12, doneDaysAgo: 8, estimatedHrs: 6, logged: [120, 180] },
-      { title: 'Vẽ user flow đặt lịch', column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'phamthinhan', createdDaysAgo: 11, doneDaysAgo: 6, estimatedHrs: 8, logged: [240, 120] },
-      { title: 'Thiết kế màn hình đăng ký gia sư', column: 'Đang duyệt', status: 'IN_REVIEW', priority: 'HIGH', assignee: 'phamthinhan', createdDaysAgo: 9, dueInDays: 2, estimatedHrs: 10, logged: [180, 240] },
-      { title: 'Dựng API đặt lịch', column: 'Đang làm', status: 'IN_PROGRESS', priority: 'CRITICAL', assignee: 'lequangthinh', createdDaysAgo: 8, dueInDays: 3, estimatedHrs: 16, logged: [240, 300, 180] },
-      { title: 'Tích hợp thanh toán VNPay', column: 'Đang làm', status: 'IN_PROGRESS', priority: 'HIGH', assignee: 'vothanhdat', createdDaysAgo: 7, dueInDays: 5, estimatedHrs: 12, logged: [120, 240] },
-      { title: 'Viết kịch bản pitch 5 phút', column: 'Cần làm', status: 'TODO', priority: 'MEDIUM', assignee: 'nguyenvanhoang', createdDaysAgo: 5, dueInDays: 6, estimatedHrs: 4 },
-      { title: 'Chuẩn bị slide bảo vệ', column: 'Cần làm', status: 'TODO', priority: 'HIGH', assignee: 'tranthimyduyen', createdDaysAgo: 4, dueInDays: 7, estimatedHrs: 6 },
-      { title: 'Dự toán chi phí vận hành năm đầu', column: 'Backlog', status: 'BACKLOG', priority: 'LOW', assignee: 'vothanhdat', createdDaysAgo: 3, estimatedHrs: 5 },
-      { title: 'Đăng ký sở hữu trí tuệ tên thương hiệu', column: 'Backlog', status: 'BACKLOG', priority: 'LOW', assignee: 'nguyenvanhoang', createdDaysAgo: 2, estimatedHrs: 3 },
+      {
+        title: 'Khảo sát 50 phụ huynh quận Hải Châu',
+        column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'tranthimyduyen',
+        createdDaysAgo: 13, doneDaysAgo: 9, estimatedHrs: 12, logged: [180, 240, 150],
+        tags: ['Khảo sát'],
+        subtasks: [
+          { title: 'Soạn bảng hỏi', done: true },
+          { title: 'Đi 3 trường tiểu học', done: true },
+          { title: 'Nhập liệu vào Sheet', done: true },
+        ],
+        comments: [
+          { from: 'tranthimyduyen', body: 'xong 50 phiếu r nha mn, link sheet t để trong mô tả', daysAgo: 9 },
+          { from: 'nguyenvanhoang', body: '@tranthimyduyen ngon, 38/50 chịu trả trên 150k/buổi là ổn r đó', daysAgo: 9 },
+        ],
+      },
+      {
+        title: 'Phân tích đối thủ (Tutor.vn, Kyna)',
+        column: 'Xong', status: 'DONE', priority: 'MEDIUM', assignee: 'lequangthinh',
+        createdDaysAgo: 12, doneDaysAgo: 8, estimatedHrs: 6, logged: [120, 180],
+        tags: ['Khảo sát', 'Báo cáo'],
+        comments: [{ from: 'lequangthinh', body: 'nói chung 2 ông kia phí cao mà ko có lọc theo quận, mình chen vô chỗ đó dc', daysAgo: 8 }],
+      },
+      {
+        title: 'Vẽ user flow đặt lịch',
+        column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'phamthinhan',
+        createdDaysAgo: 11, doneDaysAgo: 6, estimatedHrs: 8, logged: [240, 120],
+        tags: ['Thiết kế'],
+      },
+      {
+        title: 'Thiết kế màn đăng ký gia sư',
+        column: 'Đang duyệt', status: 'IN_REVIEW', priority: 'HIGH', assignee: 'phamthinhan',
+        createdDaysAgo: 9, dueInDays: 2, estimatedHrs: 10, logged: [180, 240],
+        tags: ['Thiết kế'],
+        subtasks: [
+          { title: 'Form thông tin cá nhân', done: true },
+          { title: 'Upload bằng cấp', done: true },
+          { title: 'Màn chờ duyệt', done: false },
+        ],
+        comments: [
+          { from: 'phamthinhan', body: 'đẩy lên Figma r, @nguyenvanhoang @tranthimyduyen vô cmt giúp e vs ạ', daysAgo: 2 },
+          { from: 'nguyenvanhoang', body: 'nút "Gửi hồ sơ" bé quá, phóng to lên tí. còn lại oke', daysAgo: 1 },
+          { from: 'phamthinhan', body: 'dạ e sửa lun', daysAgo: 1 },
+        ],
+      },
+      {
+        title: 'Dựng API đặt lịch',
+        column: 'Đang làm', status: 'IN_PROGRESS', priority: 'CRITICAL', assignee: 'lequangthinh',
+        createdDaysAgo: 8, dueInDays: 3, estimatedHrs: 16, logged: [240, 300, 180],
+        tags: ['Lập trình', 'Gấp'],
+        subtasks: [
+          { title: 'CRUD lịch trống', done: true },
+          { title: 'Check trùng giờ', done: false },
+          { title: 'Gửi mail xác nhận', done: false },
+        ],
+        comments: [
+          { from: 'lequangthinh', body: 'phần check trùng giờ hơi khoai, 2 phụ huynh đặt cùng lúc là bị đè nhau', daysAgo: 4 },
+          { from: 'nguyenthulinh', body: 'khoá theo slot thử xem b, kiểu ai vô trc thì giữ 5p', daysAgo: 4 },
+          { from: 'lequangthinh', body: '@nguyenthulinh ukm để t thử, cảm ơn nha', daysAgo: 3 },
+        ],
+      },
+      {
+        title: 'Viết kịch bản pitch 5 phút',
+        column: 'Cần làm', status: 'TODO', priority: 'MEDIUM', assignee: 'nguyenvanhoang',
+        createdDaysAgo: 5, dueInDays: 6, estimatedHrs: 4, tags: ['Báo cáo'],
+      },
+      {
+        title: 'Chuẩn bị slide bảo vệ',
+        column: 'Cần làm', status: 'TODO', priority: 'HIGH', assignee: 'tranthimyduyen',
+        createdDaysAgo: 4, dueInDays: 7, estimatedHrs: 6, tags: ['Báo cáo', 'Gấp'],
+        comments: [{ from: 'tranthimyduyen', body: 'ai có template slide đẹp đẹp ko cho t xin vs', daysAgo: 3 }],
+      },
+      {
+        title: 'Dự toán chi phí vận hành năm đầu',
+        column: 'Backlog', status: 'BACKLOG', priority: 'LOW', assignee: 'nguyenthulinh',
+        createdDaysAgo: 3, estimatedHrs: 5, tags: ['Báo cáo'],
+      },
     ],
     chat: [
-      { from: 'nguyenvanhoang', body: 'Chào cả nhóm, mình tạo không gian này để theo tiến độ nhé.', daysAgo: 13 },
-      { from: 'tranthimyduyen', body: 'Khảo sát xong 50 phiếu rồi nha, kết quả mình để trong file đính kèm task.', daysAgo: 9 },
-      { from: 'lequangthinh', body: 'API đặt lịch đang vướng phần trùng giờ, mình xử lý trong hôm nay.', daysAgo: 4 },
-      { from: 'nguyenvanhoang', body: 'Thứ 6 tuần này 14h họp chốt slide bảo vệ, cả nhóm sắp xếp có mặt đầy đủ.', daysAgo: 2, pinned: true },
-      { from: 'phamthinhan', body: 'Màn hình đăng ký gia sư mình đẩy lên rồi, mọi người review giúp.', daysAgo: 1 },
+      { from: 'nguyenvanhoang', body: 'ê mn, t tạo chỗ này để theo tiến độ cho dễ nha, khỏi lục zalo', daysAgo: 13 },
+      { from: 'tranthimyduyen', body: 'oke lun', daysAgo: 13 },
+      { from: 'phamthinhan', body: 'app nhìn xịn ghê =))', daysAgo: 12 },
+      { from: 'tranthimyduyen', body: 'khảo sát xong r nhe, số liệu t để trong task lun', daysAgo: 9 },
+      { from: 'lequangthinh', body: 'api đặt lịch t đang vướng chỗ trùng giờ, chắc tối nay mới xong', daysAgo: 4 },
+      { from: 'nguyenvanhoang', body: 'ko sao, cứ từ từ. mà nhớ đừng để tới sát deadline nha =))', daysAgo: 4 },
+      {
+        from: 'nguyenvanhoang',
+        body: 'THỨ 6 TUẦN NÀY 14H HỌP CHỐT SLIDE BẢO VỆ nha mn. Ai bận thì nhắn t trước, đừng im lặng rồi vắng.',
+        daysAgo: 2, pinned: true,
+      },
+      { from: 'phamthinhan', body: 'dạ e có mặt ạ', daysAgo: 2 },
+      { from: 'nguyenthulinh', body: 't đi dc', daysAgo: 1 },
+      { from: 'lequangthinh', body: 'hic t trùng lịch học, t vô muộn 15p dc ko a', daysAgo: 1 },
     ],
     blockers: [
       {
-        title: 'Chưa có tài khoản merchant VNPay',
-        description: 'Đăng ký sandbox cần mã số thuế của doanh nghiệp, nhóm sinh viên chưa có.',
-        impact: BlockerImpact.BLOCKING,
-        by: 'vothanhdat',
-        daysAgo: 5,
+        title: 'Chưa có tài khoản merchant để test thanh toán',
+        description: 'Đăng ký sandbox đòi mã số thuế doanh nghiệp, nhóm sinh viên ko có. Đang hỏi thầy xem mượn dc của trường ko.',
+        impact: BlockerImpact.BLOCKING, by: 'lequangthinh', daysAgo: 5,
       },
       {
-        title: 'Thiếu dữ liệu giá gia sư thị trường',
-        impact: BlockerImpact.SERIOUS,
-        by: 'tranthimyduyen',
-        daysAgo: 8,
-        resolved: { by: 'lequangthinh', how: 'Lấy từ báo cáo thị trường của Sở GD-ĐT, đủ dùng cho mô hình.', daysAgo: 3 },
+        title: 'Thiếu số liệu giá gia sư thị trường',
+        impact: BlockerImpact.SERIOUS, by: 'tranthimyduyen', daysAgo: 8,
+        resolved: { by: 'nguyenthulinh', how: 'Lấy từ báo cáo của Sở GD-ĐT 2025, đủ dùng cho mô hình tài chính.', daysAgo: 3 },
       },
     ],
   },
+
   {
-    name: SEED_PROJECTS[1],
-    description: 'Đề tài nghiên cứu khoa học cấp trường — hành vi mua sắm trực tuyến của sinh viên.',
+    name: 'NCKH: Hành vi mua sắm online của Gen Z',
+    description: 'Đề tài nghiên cứu khoa học cấp trường. Nộp bản full trước 30/11.',
     coverColor: '#0F766E',
     startedDaysAgo: 12,
     owner: 'buihoangnam',
     members: [
       { id: 'buihoangnam', role: ProjectRole.OWNER },
-      { id: 'nguyenthulinh', role: ProjectRole.MANAGER },
+      { id: 'truongthiha', role: ProjectRole.MANAGER },
       { id: 'hoangminhtri', role: ProjectRole.MEMBER },
-      { id: 'truongthiha', role: ProjectRole.MEMBER },
-      { id: 'dinhvanphuc', role: ProjectRole.MEMBER },
-      { id: 'lythikimanh', role: ProjectRole.MEMBER },
-      { id: 'nguyenbaolong', role: ProjectRole.VIEWER },
+      { id: 'nguyenthulinh', role: ProjectRole.MEMBER },
+      { id: 'dothihongnhung', role: ProjectRole.MEMBER },
     ],
+    tags: ['Khảo sát', 'Báo cáo', 'Gấp'],
     tasks: [
-      { title: 'Tổng quan tài liệu 20 bài báo', column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'nguyenthulinh', createdDaysAgo: 12, doneDaysAgo: 8, estimatedHrs: 20, logged: [300, 240, 180, 240] },
-      { title: 'Xây dựng bảng hỏi khảo sát', column: 'Xong', status: 'DONE', priority: 'CRITICAL', assignee: 'truongthiha', createdDaysAgo: 11, doneDaysAgo: 7, estimatedHrs: 10, logged: [180, 240] },
-      { title: 'Thu thập 300 mẫu khảo sát', column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'dinhvanphuc', createdDaysAgo: 10, doneDaysAgo: 4, estimatedHrs: 25, logged: [240, 300, 300, 180] },
-      { title: 'Làm sạch dữ liệu trên SPSS', column: 'Đang làm', status: 'IN_PROGRESS', priority: 'HIGH', assignee: 'hoangminhtri', createdDaysAgo: 6, dueInDays: 2, estimatedHrs: 12, logged: [180, 240] },
-      { title: 'Chạy mô hình hồi quy', column: 'Cần làm', status: 'TODO', priority: 'CRITICAL', assignee: 'hoangminhtri', createdDaysAgo: 5, dueInDays: 4, estimatedHrs: 15 },
-      { title: 'Viết chương 4 — Kết quả nghiên cứu', column: 'Cần làm', status: 'TODO', priority: 'HIGH', assignee: 'nguyenthulinh', createdDaysAgo: 4, dueInDays: 8, estimatedHrs: 18 },
-      { title: 'Chuẩn bị poster hội nghị sinh viên NCKH', column: 'Backlog', status: 'BACKLOG', priority: 'MEDIUM', assignee: 'lythikimanh', createdDaysAgo: 3, estimatedHrs: 8 },
-      { title: 'Xin xác nhận số liệu từ phòng Đào tạo', column: 'Backlog', status: 'BACKLOG', priority: 'LOW', assignee: 'buihoangnam', createdDaysAgo: 2, estimatedHrs: 2 },
+      {
+        title: 'Tổng quan 20 bài báo liên quan',
+        column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'truongthiha',
+        createdDaysAgo: 12, doneDaysAgo: 8, estimatedHrs: 20, logged: [300, 240, 180, 240],
+        tags: ['Báo cáo'],
+        comments: [{ from: 'truongthiha', body: 'đọc xong 20 bài mà mắt muốn lòi luôn á :v', daysAgo: 8 }],
+      },
+      {
+        title: 'Xây bảng hỏi khảo sát',
+        column: 'Xong', status: 'DONE', priority: 'CRITICAL', assignee: 'truongthiha',
+        createdDaysAgo: 11, doneDaysAgo: 7, estimatedHrs: 10, logged: [180, 240],
+        tags: ['Khảo sát'],
+        subtasks: [
+          { title: 'Thang đo từ bài gốc', done: true },
+          { title: 'Test thử 30 mẫu', done: true },
+          { title: 'Chỉnh câu khó hiểu', done: true },
+        ],
+        comments: [
+          { from: 'truongthiha', body: 'Cronbach Alpha 0.82 nha mn, ngon r', daysAgo: 7 },
+          { from: 'buihoangnam', body: '@truongthiha đỉnh. vậy chốt bảng hỏi này lun, ko sửa nx', daysAgo: 7 },
+        ],
+      },
+      {
+        title: 'Thu 300 mẫu khảo sát',
+        column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'hoangminhtri',
+        createdDaysAgo: 10, doneDaysAgo: 4, estimatedHrs: 25, logged: [240, 300, 300, 180],
+        tags: ['Khảo sát'],
+        comments: [
+          { from: 'hoangminhtri', body: 'dc 350 mẫu lận, dư 50 =))', daysAgo: 4 },
+          { from: 'dothihongnhung', body: 'ủa sao hay z, t rải form cả tuần mà ko ai điền hết huhu', daysAgo: 4 },
+          { from: 'hoangminhtri', body: 't đứng canteen giờ trưa, năn nỉ từng đứa :v', daysAgo: 4 },
+        ],
+      },
+      {
+        title: 'Làm sạch dữ liệu trên SPSS',
+        column: 'Đang làm', status: 'IN_PROGRESS', priority: 'HIGH', assignee: 'hoangminhtri',
+        createdDaysAgo: 6, dueInDays: 2, estimatedHrs: 12, logged: [180, 240],
+        tags: ['Báo cáo', 'Gấp'],
+        subtasks: [
+          { title: 'Loại phiếu ko hợp lệ', done: true },
+          { title: 'Mã hoá biến', done: false },
+        ],
+        comments: [{ from: 'hoangminhtri', body: 'có 18 phiếu trả lời bừa (chọn 1 hết từ trên xuống), t loại ra nha', daysAgo: 2 }],
+      },
+      {
+        title: 'Chạy mô hình hồi quy',
+        column: 'Cần làm', status: 'TODO', priority: 'CRITICAL', assignee: 'hoangminhtri',
+        createdDaysAgo: 5, dueInDays: 4, estimatedHrs: 15, tags: ['Báo cáo', 'Gấp'],
+      },
+      {
+        title: 'Viết chương 4 — Kết quả nghiên cứu',
+        column: 'Cần làm', status: 'TODO', priority: 'HIGH', assignee: 'truongthiha',
+        createdDaysAgo: 4, dueInDays: 8, estimatedHrs: 18, tags: ['Báo cáo'],
+      },
+      {
+        title: 'Làm poster hội nghị SV NCKH',
+        column: 'Backlog', status: 'BACKLOG', priority: 'MEDIUM', assignee: 'dothihongnhung',
+        createdDaysAgo: 3, estimatedHrs: 8, tags: ['Thiết kế'],
+      },
     ],
     chat: [
-      { from: 'buihoangnam', body: 'Deadline nộp đề tài là 30/11, mình chia việc theo chương nhé.', daysAgo: 12, pinned: true },
-      { from: 'truongthiha', body: 'Bảng hỏi đã qua vòng thử nghiệm 30 mẫu, Cronbach Alpha đạt 0.82.', daysAgo: 7 },
-      { from: 'dinhvanphuc', body: 'Thu đủ 300 mẫu rồi mọi người ơi, nhiều hơn dự kiến 50 mẫu.', daysAgo: 4 },
-      { from: 'hoangminhtri', body: 'Dữ liệu có 18 phiếu trả lời không hợp lệ, mình loại ra nhé.', daysAgo: 2 },
+      { from: 'buihoangnam', body: 'Deadline nộp là 30/11 nha mn, còn đúng 1 tháng. Chia việc theo chương cho dễ quản lý.', daysAgo: 12, pinned: true },
+      { from: 'truongthiha', body: 'ok a, e nhận chương 2 với 4', daysAgo: 12 },
+      { from: 'hoangminhtri', body: 't lo phần số liệu với SPSS', daysAgo: 12 },
+      { from: 'dothihongnhung', body: 'e phụ khảo sát với làm poster dc ko ạ', daysAgo: 11 },
+      { from: 'buihoangnam', body: 'dc em, vậy chốt nha', daysAgo: 11 },
+      { from: 'hoangminhtri', body: 'thu đủ 300 mẫu r mn ơi, dư 50 lận', daysAgo: 4 },
+      { from: 'truongthiha', body: 'ghê z :v', daysAgo: 4 },
+      { from: 'buihoangnam', body: '@hoangminhtri chạy hồi quy xong nhớ xuất bảng ra word lun nha, đừng để tới lúc ghép mới làm', daysAgo: 2 },
     ],
     blockers: [
       {
-        title: 'Bản quyền SPSS hết hạn',
-        description: 'Phòng máy thực hành chỉ còn 3 máy có license, phải xếp lịch dùng chung.',
-        impact: BlockerImpact.SERIOUS,
-        by: 'hoangminhtri',
-        daysAgo: 3,
+        title: 'Bản quyền SPSS của trường hết hạn',
+        description: 'Phòng máy chỉ còn 3 máy có license, phải xếp lịch dùng chung. Chạy mô hình bị chậm lại.',
+        impact: BlockerImpact.SERIOUS, by: 'hoangminhtri', daysAgo: 3,
       },
     ],
   },
+
   {
-    name: SEED_PROJECTS[2],
-    description: 'Hệ thống giám sát độ ẩm và tưới tiêu tự động cho vườn rau tại Hòa Vang.',
+    name: 'Đồ án: Hệ thống IoT tưới tiêu tự động',
+    description: 'Đồ án tốt nghiệp. Giám sát độ ẩm đất và tưới tự động cho vườn rau ở Hoà Vang.',
     coverColor: '#16A34A',
     startedDaysAgo: 11,
     owner: 'phanducmanh',
@@ -279,131 +391,134 @@ const PROJECTS: ProjectSeed[] = [
       { id: 'phanducmanh', role: ProjectRole.OWNER },
       { id: 'hothikieutrang', role: ProjectRole.MANAGER },
       { id: 'nguyenhuuthang', role: ProjectRole.MEMBER },
-      { id: 'caothiphuonguyen', role: ProjectRole.MEMBER },
       { id: 'tranminhkhoa', role: ProjectRole.MEMBER },
+      { id: 'nguyentuananh', role: ProjectRole.MEMBER },
     ],
+    tags: ['Phần cứng', 'Lập trình', 'Báo cáo'],
     tasks: [
-      { title: 'Chọn cảm biến độ ẩm đất', column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'nguyenhuuthang', createdDaysAgo: 11, doneDaysAgo: 8, estimatedHrs: 6, logged: [180, 120] },
-      { title: 'Thiết kế mạch nguồn pin mặt trời', column: 'Xong', status: 'DONE', priority: 'CRITICAL', assignee: 'phanducmanh', createdDaysAgo: 10, doneDaysAgo: 5, estimatedHrs: 16, logged: [240, 300, 240] },
-      { title: 'Lập trình firmware ESP32', column: 'Đang làm', status: 'IN_PROGRESS', priority: 'CRITICAL', assignee: 'tranminhkhoa', createdDaysAgo: 8, dueInDays: 3, estimatedHrs: 20, logged: [300, 240, 180] },
-      { title: 'Dashboard theo dõi thời gian thực', column: 'Đang làm', status: 'IN_PROGRESS', priority: 'HIGH', assignee: 'caothiphuonguyen', createdDaysAgo: 7, dueInDays: 5, estimatedHrs: 14, logged: [240, 180] },
-      { title: 'Thử nghiệm thực địa 1 tuần', column: 'Cần làm', status: 'TODO', priority: 'HIGH', assignee: 'hothikieutrang', createdDaysAgo: 4, dueInDays: 9, estimatedHrs: 10 },
-      { title: 'Viết thuyết minh đồ án', column: 'Cần làm', status: 'TODO', priority: 'MEDIUM', assignee: 'phanducmanh', createdDaysAgo: 3, dueInDays: 12, estimatedHrs: 25 },
-      { title: 'Quay video demo sản phẩm', column: 'Backlog', status: 'BACKLOG', priority: 'LOW', assignee: 'caothiphuonguyen', createdDaysAgo: 2, estimatedHrs: 6 },
+      {
+        title: 'Chọn cảm biến độ ẩm đất',
+        column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'nguyenhuuthang',
+        createdDaysAgo: 11, doneDaysAgo: 8, estimatedHrs: 6, logged: [180, 120],
+        tags: ['Phần cứng'],
+        comments: [
+          { from: 'nguyenhuuthang', body: 'chốt con capacitive nha, con resistive rẻ hơn mà chôn đất 2 tuần là rỉ', daysAgo: 8 },
+          { from: 'phanducmanh', body: 'ukm, đắt hơn tí mà khỏi thay', daysAgo: 8 },
+        ],
+      },
+      {
+        title: 'Thiết kế mạch nguồn pin mặt trời',
+        column: 'Xong', status: 'DONE', priority: 'CRITICAL', assignee: 'phanducmanh',
+        createdDaysAgo: 10, doneDaysAgo: 5, estimatedHrs: 16, logged: [240, 300, 240],
+        tags: ['Phần cứng'],
+        subtasks: [
+          { title: 'Tính công suất tiêu thụ', done: true },
+          { title: 'Chọn pin + sạc', done: true },
+          { title: 'Test chạy 48h', done: true },
+        ],
+      },
+      {
+        title: 'Lập trình firmware ESP32',
+        column: 'Đang làm', status: 'IN_PROGRESS', priority: 'CRITICAL', assignee: 'tranminhkhoa',
+        createdDaysAgo: 8, dueInDays: 3, estimatedHrs: 20, logged: [300, 240, 180],
+        tags: ['Lập trình', 'Gấp'],
+        subtasks: [
+          { title: 'Đọc cảm biến', done: true },
+          { title: 'Gửi dữ liệu lên server', done: true },
+          { title: 'Chế độ ngủ tiết kiệm pin', done: false },
+          { title: 'Tự tưới theo ngưỡng', done: false },
+        ],
+        comments: [
+          { from: 'tranminhkhoa', body: 'wifi ngoài vườn yếu quá mn ơi, cách nhà 80m là rớt lun', daysAgo: 5 },
+          { from: 'nguyentuananh', body: 'thử LoRa đi b, t có module dư cho mượn', daysAgo: 5 },
+          { from: 'tranminhkhoa', body: '@nguyentuananh dc lun, mai t qua lấy nha', daysAgo: 4 },
+          { from: 'hothikieutrang', body: 'nhớ ghi lại vô báo cáo phần đổi wifi sang LoRa nha, thầy sẽ hỏi', daysAgo: 4 },
+        ],
+      },
+      {
+        title: 'Dashboard theo dõi realtime',
+        column: 'Đang làm', status: 'IN_PROGRESS', priority: 'HIGH', assignee: 'nguyentuananh',
+        createdDaysAgo: 7, dueInDays: 5, estimatedHrs: 14, logged: [240, 180],
+        tags: ['Lập trình'],
+        comments: [{ from: 'nguyentuananh', body: 'biểu đồ độ ẩm theo giờ xong r, còn phần cảnh báo thôi', daysAgo: 2 }],
+      },
+      {
+        title: 'Thử nghiệm thực địa 1 tuần',
+        column: 'Cần làm', status: 'TODO', priority: 'HIGH', assignee: 'hothikieutrang',
+        createdDaysAgo: 4, dueInDays: 9, estimatedHrs: 10, tags: ['Phần cứng'],
+      },
+      {
+        title: 'Viết thuyết minh đồ án',
+        column: 'Cần làm', status: 'TODO', priority: 'MEDIUM', assignee: 'phanducmanh',
+        createdDaysAgo: 3, dueInDays: 12, estimatedHrs: 25, tags: ['Báo cáo'],
+      },
+      {
+        title: 'Quay video demo sản phẩm',
+        column: 'Backlog', status: 'BACKLOG', priority: 'LOW', assignee: 'nguyentuananh',
+        createdDaysAgo: 2, estimatedHrs: 6,
+      },
     ],
     chat: [
-      { from: 'phanducmanh', body: 'Linh kiện về rồi, chiều nay 15h cả nhóm qua phòng Lab C301 ráp thử.', daysAgo: 9 },
-      { from: 'tranminhkhoa', body: 'ESP32 đọc cảm biến ổn, nhưng wifi ngoài vườn yếu quá, đang tính dùng LoRa.', daysAgo: 5 },
-      { from: 'hothikieutrang', body: 'Thầy hướng dẫn duyệt đề cương rồi nhé, mình đã up lên drive chung.', daysAgo: 3, pinned: true },
+      { from: 'phanducmanh', body: 'linh kiện về r nha, chiều nay 15h qua Lab C301 ráp thử', daysAgo: 9 },
+      { from: 'nguyenhuuthang', body: 'ok a', daysAgo: 9 },
+      { from: 'tranminhkhoa', body: 't tới trễ tí nha, đang kẹt tiết', daysAgo: 9 },
+      { from: 'tranminhkhoa', body: 'esp32 đọc cảm biến ổn r mà wifi ngoài vườn yếu quá :(( đang tính chuyển qua LoRa', daysAgo: 5 },
+      { from: 'nguyentuananh', body: 't có module LoRa dư nè, cho mượn', daysAgo: 5 },
+      { from: 'tranminhkhoa', body: 'cứu tinh =))', daysAgo: 5 },
+      {
+        from: 'hothikieutrang',
+        body: 'Thầy duyệt đề cương r nhe mn. File t up lên drive chung, ai chưa xem thì vô xem. Tuần sau thầy hỏi tiến độ đó.',
+        daysAgo: 3, pinned: true,
+      },
+      { from: 'phanducmanh', body: 'ngon, vậy là yên tâm phần hướng', daysAgo: 3 },
     ],
     blockers: [
       {
-        title: 'Sóng wifi không phủ tới khu vườn thử nghiệm',
-        description: 'Cách nhà 80m, ESP32 mất kết nối liên tục. Đang cân nhắc chuyển sang LoRa.',
-        impact: BlockerImpact.BLOCKING,
-        by: 'tranminhkhoa',
-        daysAgo: 5,
+        title: 'Sóng wifi ko phủ tới vườn thử nghiệm',
+        description: 'Cách nhà 80m, ESP32 rớt kết nối liên tục. Đang thử chuyển sang LoRa, mượn module của Tuấn Anh.',
+        impact: BlockerImpact.BLOCKING, by: 'tranminhkhoa', daysAgo: 5,
       },
       {
-        title: 'Chưa xin được phép dùng vườn của hộ dân',
-        impact: BlockerImpact.MINOR,
-        by: 'hothikieutrang',
-        daysAgo: 7,
-        resolved: { by: 'phanducmanh', how: 'Bác chủ vườn đồng ý cho mượn 200m² trong 2 tháng.', daysAgo: 4 },
-      },
-    ],
-  },
-  {
-    name: SEED_PROJECTS[3],
-    description: 'Chuỗi workshop lập trình miễn phí cho sinh viên năm nhất trong hè.',
-    coverColor: '#7C3AED',
-    startedDaysAgo: 10,
-    owner: 'nguyentuananh',
-    members: [
-      { id: 'nguyentuananh', role: ProjectRole.OWNER },
-      { id: 'dothihongnhung', role: ProjectRole.MANAGER },
-      { id: 'lethanhtung', role: ProjectRole.MEMBER },
-      { id: 'vuthimylinh', role: ProjectRole.MEMBER },
-      { id: 'nguyendinhquan', role: ProjectRole.MEMBER },
-      { id: 'trinhthuthao', role: ProjectRole.VIEWER },
-    ],
-    tasks: [
-      { title: 'Chốt nội dung 6 buổi workshop', column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'dothihongnhung', createdDaysAgo: 10, doneDaysAgo: 7, estimatedHrs: 8, logged: [180, 240] },
-      { title: 'Mời diễn giả buổi 1 và 2', column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'nguyentuananh', createdDaysAgo: 9, doneDaysAgo: 5, estimatedHrs: 5, logged: [120, 150] },
-      { title: 'Đặt phòng hội trường', column: 'Đang duyệt', status: 'IN_REVIEW', priority: 'MEDIUM', assignee: 'vuthimylinh', createdDaysAgo: 6, dueInDays: 1, estimatedHrs: 3, logged: [90] },
-      { title: 'Thiết kế poster và ấn phẩm', column: 'Đang làm', status: 'IN_PROGRESS', priority: 'MEDIUM', assignee: 'nguyendinhquan', createdDaysAgo: 5, dueInDays: 4, estimatedHrs: 10, logged: [180, 120] },
-      { title: 'Mở form đăng ký tham dự', column: 'Cần làm', status: 'TODO', priority: 'HIGH', assignee: 'lethanhtung', createdDaysAgo: 3, dueInDays: 3, estimatedHrs: 4 },
-      { title: 'Chuẩn bị quà cho người tham dự', column: 'Backlog', status: 'BACKLOG', priority: 'LOW', assignee: 'vuthimylinh', createdDaysAgo: 2, estimatedHrs: 4 },
-    ],
-    chat: [
-      { from: 'nguyentuananh', body: 'Mục tiêu 150 bạn đăng ký, mọi người đẩy truyền thông giúp nhé.', daysAgo: 10, pinned: true },
-      { from: 'dothihongnhung', body: 'Anh diễn giả buổi 2 xác nhận tham gia rồi ạ.', daysAgo: 5 },
-      { from: 'nguyendinhquan', body: 'Poster bản nháp mình để trong task, mọi người góp ý màu giúp.', daysAgo: 2 },
-    ],
-    blockers: [
-      {
-        title: 'Hội trường lớn đã kín lịch tháng 7',
-        description: 'Phòng Công tác sinh viên báo chỉ còn phòng 80 chỗ, không đủ cho mục tiêu 150 người.',
-        impact: BlockerImpact.SERIOUS,
-        by: 'vuthimylinh',
-        daysAgo: 4,
-      },
-    ],
-  },
-  {
-    name: SEED_PROJECTS[4],
-    description: 'Truyền thông cho ngày hội việc làm thường niên của trường.',
-    coverColor: '#D97706',
-    startedDaysAgo: 7,
-    owner: 'ngothikimngan',
-    members: [
-      { id: 'ngothikimngan', role: ProjectRole.OWNER },
-      { id: 'huynhvantai', role: ProjectRole.MANAGER },
-      { id: 'nguyenthanhvinh', role: ProjectRole.MEMBER },
-      { id: 'lethiyennhi', role: ProjectRole.MEMBER },
-      { id: 'phamthihongtham', role: ProjectRole.MEMBER },
-      { id: 'dangquochuy', role: ProjectRole.MEMBER },
-      { id: 'nguyenvanloc', role: ProjectRole.VIEWER },
-    ],
-    tasks: [
-      { title: 'Lập kế hoạch truyền thông 3 tuần', column: 'Xong', status: 'DONE', priority: 'HIGH', assignee: 'huynhvantai', createdDaysAgo: 7, doneDaysAgo: 4, estimatedHrs: 6, logged: [180, 120] },
-      { title: 'Liên hệ 20 doanh nghiệp tham gia', column: 'Đang làm', status: 'IN_PROGRESS', priority: 'CRITICAL', assignee: 'ngothikimngan', createdDaysAgo: 6, dueInDays: 2, estimatedHrs: 15, logged: [240, 180, 120] },
-      { title: 'Viết bài PR trên fanpage', column: 'Đang làm', status: 'IN_PROGRESS', priority: 'MEDIUM', assignee: 'lethiyennhi', createdDaysAgo: 4, dueInDays: 3, estimatedHrs: 8, logged: [120] },
-      { title: 'Dựng video teaser 30 giây', column: 'Cần làm', status: 'TODO', priority: 'HIGH', assignee: 'nguyenthanhvinh', createdDaysAgo: 3, dueInDays: 5, estimatedHrs: 12 },
-      { title: 'Thiết kế gian hàng doanh nghiệp', column: 'Cần làm', status: 'TODO', priority: 'MEDIUM', assignee: 'dangquochuy', createdDaysAgo: 2, dueInDays: 6, estimatedHrs: 10 },
-      { title: 'Tổng kết số liệu sau sự kiện', column: 'Backlog', status: 'BACKLOG', priority: 'LOW', assignee: 'phamthihongtham', createdDaysAgo: 1, estimatedHrs: 5 },
-    ],
-    chat: [
-      { from: 'ngothikimngan', body: 'Ngày hội diễn ra 20/7 tại sân trường, còn đúng 3 tuần nữa.', daysAgo: 7, pinned: true },
-      { from: 'huynhvantai', body: 'Mình đã có danh sách 35 doanh nghiệp từ năm ngoái để liên hệ lại.', daysAgo: 5 },
-      { from: 'lethiyennhi', body: 'Bài PR đầu tiên đạt 1.2k lượt tiếp cận sau 1 ngày nha mọi người.', daysAgo: 1 },
-    ],
-    blockers: [
-      {
-        title: 'Kinh phí truyền thông chưa được duyệt',
-        description: 'Đề xuất 15 triệu, phòng Tài chính đang xem xét. Chưa chạy quảng cáo được.',
-        impact: BlockerImpact.BLOCKING,
-        by: 'huynhvantai',
-        daysAgo: 3,
+        title: 'Chưa xin dc phép dùng vườn của hộ dân',
+        impact: BlockerImpact.MINOR, by: 'hothikieutrang', daysAgo: 7,
+        resolved: { by: 'phanducmanh', how: 'Bác chủ vườn đồng ý cho mượn 200m² trong 2 tháng, có ghi giấy tay.', daysAgo: 4 },
       },
     ],
   },
 ];
+
+const SEED_PROJECTS = PROJECTS.map((p) => p.name);
 
 /* ─── Cleanup ────────────────────────────────────────────── */
 
 /**
  * Removes everything a previous run created, and nothing else.
  *
- * Order matters. A project cascades to its tasks, members, messages, blockers, comments and time
- * logs, but `Task.creator` and `Comment.author` are plain references with no cascade — delete the
- * accounts first and Postgres refuses, so the projects go first and the accounts follow.
+ * **Projects are found through membership, not by name.** Matching on names looks tidier right
+ * up until the names change — renaming the three projects here once left the previous run's five
+ * behind, and because `Task.creator`, `Comment.author` and `TimeLog.user` are plain references
+ * with no cascade, deleting the accounts then failed outright. Membership cannot drift that way.
+ *
+ * This leans on these accounts existing for the seed and nothing else, which is true: they are
+ * invented people with invented e-mail addresses. Every project they belong to is seed data.
+ *
+ * Order matters. A project cascades to its tasks, subtasks, members, messages, blockers,
+ * comments, mentions, files and time logs — so once the projects are gone nothing references
+ * the users any more and they can be deleted.
+ *
+ * Tag rows are left alone on purpose: `Tag.name` is unique table-wide and other projects may be
+ * using the same ones. `ProjectTag` and `TaskTag` are what scope them, and those cascade.
  */
 async function clean(): Promise<number> {
   const users = await prisma.user.findMany({ where: { email: { in: SEED_EMAILS } }, select: { id: true } });
   const ids = users.map((u) => u.id);
 
+  if (ids.length) {
+    await prisma.project.deleteMany({ where: { members: { some: { userId: { in: ids } } } } });
+  }
+  // Also by name, for a project whose members were somehow cleared out from under it.
   await prisma.project.deleteMany({ where: { name: { in: SEED_PROJECTS } } });
+
   if (ids.length) {
     await prisma.notification.deleteMany({ where: { recipientId: { in: ids } } });
     await prisma.payment.deleteMany({ where: { userId: { in: ids } } });
@@ -437,7 +552,6 @@ async function createStudents(): Promise<Record<string, string>> {
       select: { id: true },
     });
     byId[s.id] = user.id;
-
     if (s.pro) await giveProPlan(user.id, s.pro);
   }
   return byId;
@@ -455,34 +569,60 @@ async function giveProPlan(userId: string, plan: NonNullable<Student['pro']>) {
     const paidAt = daysAgo(boughtDaysAgo + i * cycleDays);
     await prisma.payment.create({
       data: {
-        subscriptionId: subscription.id,
-        userId,
-        amount,
-        cycle,
-        status: PaymentStatus.PAID,
-        provider: 'SEED',
+        subscriptionId: subscription.id, userId, amount, cycle,
+        status: PaymentStatus.PAID, provider: 'SEED',
         providerRef: `SEED-UNI-${userId.slice(0, 8)}-${i}`,
-        paidAt,
-        createdAt: paidAt,
+        paidAt, createdAt: paidAt,
       },
     });
   }
 
-  const startedAt = daysAgo(boughtDaysAgo + (renewals - 1) * cycleDays);
   await prisma.subscription.update({
     where: { id: subscription.id },
     data: {
-      tier: 'PRO',
-      status: 'ACTIVE',
-      cycle,
-      startedAt,
+      tier: 'PRO', status: 'ACTIVE', cycle,
+      startedAt: daysAgo(boughtDaysAgo + (renewals - 1) * cycleDays),
       currentPeriodEnd: periodEndFrom(daysAgo(boughtDaysAgo), cycle),
     },
   });
 }
 
+/** Tags are global rows keyed by name, so two projects asking for "Gấp" share one. */
+async function ensureTags(names: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const name of names) {
+    const tag = await prisma.tag.upsert({
+      where: { name },
+      create: { name, color: TAGS[name] ?? '#64748b' },
+      update: {},
+      select: { id: true },
+    });
+    out[name] = tag.id;
+  }
+  return out;
+}
+
+/**
+ * Turns the @handles written into a comment body into real Mention rows, but only for people who
+ * are actually in the project — the same rule `comments.service.create` enforces at runtime. A
+ * seed that invented mentions outside the membership would be demonstrating a bug.
+ */
+function mentionedIn(body: string, memberIds: Record<string, string>, authorHandle: string): string[] {
+  const handles = [...new Set([...body.matchAll(/@([a-zA-Z0-9_]+)/g)].map((m) => m[1]))];
+  return handles.filter((h) => h !== authorHandle && memberIds[h]).map((h) => memberIds[h]);
+}
+
 async function createProject(p: ProjectSeed, uid: Record<string, string>) {
   const startedAt = daysAgo(p.startedDaysAgo, 8);
+
+  // The project's tag set is the union of what it declares and what its tasks actually use. A
+  // task may only carry a tag scoped to its own project — `tasks.service.setTags` enforces that
+  // at runtime — so deriving the set here makes the two impossible to fall out of step, rather
+  // than leaving a task pointing at a tag the project never had.
+  const usedByTasks = p.tasks.flatMap((t) => t.tags ?? []);
+  const tagNames = [...new Set([...p.tags, ...usedByTasks])];
+  const tagIds = await ensureTags(tagNames);
+  const memberHandles = Object.fromEntries(p.members.map((m) => [m.id, uid[m.id]]));
 
   const project = await prisma.project.create({
     data: {
@@ -499,10 +639,11 @@ async function createProject(p: ProjectSeed, uid: Record<string, string>) {
         create: p.members.map((m, i) => ({
           userId: uid[m.id],
           role: m.role,
-          joinedAt: daysAgo(p.startedDaysAgo - Math.min(i, p.startedDaysAgo), 9),
+          joinedAt: daysAgo(Math.max(p.startedDaysAgo - i, 0), 9),
         })),
       },
       columns: { create: COLUMNS },
+      tags: { create: tagNames.map((name) => ({ tagId: tagIds[name] })) },
     },
     include: { columns: { orderBy: { order: 'asc' } } },
   });
@@ -511,6 +652,8 @@ async function createProject(p: ProjectSeed, uid: Record<string, string>) {
 
   for (const [i, t] of p.tasks.entries()) {
     const createdAt = daysAgo(t.createdDaysAgo, 10);
+    const completedAt = t.doneDaysAgo !== undefined ? daysAgo(t.doneDaysAgo, 16) : undefined;
+
     const task = await prisma.task.create({
       data: {
         projectId: project.id,
@@ -523,18 +666,55 @@ async function createProject(p: ProjectSeed, uid: Record<string, string>) {
         order: (i + 1) * 1000,
         startDate: createdAt,
         dueDate: t.dueInDays !== undefined ? daysAhead(t.dueInDays) : undefined,
-        completedAt: t.doneDaysAgo !== undefined ? daysAgo(t.doneDaysAgo, 16) : undefined,
+        completedAt,
         estimatedHrs: t.estimatedHrs,
         createdAt,
-        updatedAt: t.doneDaysAgo !== undefined ? daysAgo(t.doneDaysAgo, 16) : createdAt,
+        updatedAt: completedAt ?? createdAt,
+        ...(t.tags?.length && { tags: { create: t.tags.map((name) => ({ tagId: tagIds[name] })) } }),
       },
       select: { id: true },
     });
 
-    // Time logs are closed sessions, spread backwards from when the task was created, so the
-    // workload table has something to add up.
+    // Subtasks are checklist items inside the task. They carry no column and no estimate, so the
+    // board and the reports — which count `parentId: null` only — stay unaffected.
+    for (const [j, sub] of (t.subtasks ?? []).entries()) {
+      await prisma.task.create({
+        data: {
+          projectId: project.id,
+          parentId: task.id,
+          title: sub.title,
+          status: sub.done ? TaskStatus.DONE : TaskStatus.TODO,
+          priority: Priority.MEDIUM,
+          assigneeId: uid[t.assignee],
+          creatorId: uid[t.assignee],
+          order: (j + 1) * 1000,
+          completedAt: sub.done ? daysAgo(t.doneDaysAgo ?? t.createdDaysAgo - 1, 15) : undefined,
+          createdAt,
+          updatedAt: createdAt,
+        },
+      });
+    }
+
+    for (const c of t.comments ?? []) {
+      const at = daysAgo(c.daysAgo, 13 + (c.daysAgo % 5));
+      const mentions = mentionedIn(c.body, memberHandles, c.from);
+      await prisma.comment.create({
+        data: {
+          authorId: uid[c.from],
+          taskId: task.id,
+          projectId: project.id,
+          body: c.body,
+          createdAt: at,
+          updatedAt: at,
+          ...(mentions.length && { mentions: { create: mentions.map((mentionedId) => ({ mentionedId })) } }),
+        },
+      });
+    }
+
+    // Closed sessions, stepping backwards from the task's creation, so the workload table has
+    // something to add up and the burndown has a slope.
     for (const [j, minutes] of (t.logged ?? []).entries()) {
-      const startedAtLog = daysAgo(t.createdDaysAgo - j - 1, 9 + j);
+      const startedAtLog = daysAgo(Math.max(t.createdDaysAgo - j - 1, 0), 9 + j);
       await prisma.timeLog.create({
         data: {
           userId: uid[t.assignee],
@@ -549,9 +729,17 @@ async function createProject(p: ProjectSeed, uid: Record<string, string>) {
   }
 
   for (const m of p.chat) {
-    const at = daysAgo(m.daysAgo, 11 + (m.daysAgo % 6));
+    const at = daysAgo(m.daysAgo, 11 + (m.daysAgo % 6), (m.daysAgo * 13) % 60);
+    const mentions = mentionedIn(m.body, memberHandles, m.from);
     await prisma.message.create({
-      data: { projectId: project.id, authorId: uid[m.from], body: m.body, pinned: m.pinned ?? false, createdAt: at },
+      data: {
+        projectId: project.id,
+        authorId: uid[m.from],
+        body: m.body,
+        pinned: m.pinned ?? false,
+        createdAt: at,
+        ...(mentions.length && { mentions: { create: mentions.map((mentionedId) => ({ mentionedId })) } }),
+      },
     });
   }
 
@@ -574,7 +762,13 @@ async function createProject(p: ProjectSeed, uid: Record<string, string>) {
     });
   }
 
-  return project;
+  const counts = {
+    tasks: p.tasks.length,
+    subtasks: p.tasks.reduce((n, t) => n + (t.subtasks?.length ?? 0), 0),
+    comments: p.tasks.reduce((n, t) => n + (t.comments?.length ?? 0), 0),
+    chat: p.chat.length,
+  };
+  return { project, counts };
 }
 
 /* ─── Entry point ────────────────────────────────────────── */
@@ -583,29 +777,43 @@ async function main() {
   const cleanOnly = process.argv.includes('--clean');
 
   const removed = await clean();
-  if (removed) console.log(`Removed ${removed} account(s) from a previous run.`);
+  if (removed) console.log(`Đã xoá ${removed} tài khoản của lần chạy trước.`);
 
   if (cleanOnly) {
-    console.log('Cleaned. Nothing seeded.');
+    console.log('Đã dọn sạch, không seed gì thêm.');
     return;
   }
 
-  console.log('Seeding Đà Nẵng university demo data...\n');
+  console.log('Đang tạo dữ liệu demo sinh viên Đà Nẵng...\n');
   const uid = await createStudents();
+
+  let totals = { tasks: 0, subtasks: 0, comments: 0, chat: 0 };
   for (const p of PROJECTS) {
-    const project = await createProject(p, uid);
-    console.log(`  ${project.name}  —  ${p.members.length} thành viên, ${p.tasks.length} công việc`);
+    const { project, counts } = await createProject(p, uid);
+    totals = {
+      tasks: totals.tasks + counts.tasks,
+      subtasks: totals.subtasks + counts.subtasks,
+      comments: totals.comments + counts.comments,
+      chat: totals.chat + counts.chat,
+    };
+    console.log(
+      `  ${project.name}\n` +
+        `      ${p.members.length} thành viên · ${counts.tasks} công việc · ${counts.subtasks} việc con · ` +
+        `${counts.comments} bình luận · ${counts.chat} tin nhắn · ${p.blockers.length} khó khăn`,
+    );
   }
 
-  const byUni = UNIS.map((u) => `${u.short}: ${STUDENTS.filter((s) => s.uni === u.key).length}`).join(' · ');
-  const pro = STUDENTS.filter((s) => s.pro).length;
+  const byUni = UNIS.map((u) => `${u.short} ${STUDENTS.filter((s) => s.uni === u.key).length}`).join(' · ');
+  const pro = STUDENTS.filter((s) => s.pro);
+  const revenue = pro.reduce((sum, s) => sum + priceFor(s.pro!.cycle) * (s.pro!.renewals ?? 1), 0);
 
   console.log(`
-  Done.
+  Xong.
 
   ${STUDENTS.length} sinh viên   (${byUni})
-  ${PROJECTS.length} dự án, ${PROJECTS.reduce((n, p) => n + p.tasks.length, 0)} công việc
-  ${pro} tài khoản Pro — doanh thu và biểu đồ đăng ký sẽ có số liệu
+  ${PROJECTS.length} dự án · ${totals.tasks} công việc · ${totals.subtasks} việc con
+  ${totals.comments} bình luận · ${totals.chat} tin nhắn chat · ${Object.keys(TAGS).length} nhãn
+  ${pro.length} tài khoản Pro  →  doanh thu ${revenue.toLocaleString('vi-VN')} đ
 
   Đăng nhập thử:  ${emailOf(STUDENTS[0])}  /  ${PASSWORD}
 
