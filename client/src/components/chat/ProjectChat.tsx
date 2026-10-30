@@ -7,6 +7,8 @@ import { Avatar } from '../ui/Avatar';
 import { EmptyState, InlineError, Skeleton } from '../ui/States';
 import { ConfirmDialog } from '../ui/Modal';
 import { useAuthStore } from '../../stores/authStore';
+import { useMentions, MentionPerson } from '../../hooks/useMentions';
+import { MentionSuggestions } from '../ui/MentionSuggestions';
 import { keys } from '../../constants/queryKeys';
 import { formatRelative } from '../../utils/dateUtils';
 import { cn } from '../../utils/cn';
@@ -131,10 +133,32 @@ export function ProjectChat({ projectId, canPost, canModerate }: { projectId: st
     queryFn: () => projectsApi.getMembers(projectId),
   });
   // `user` is optional on the membership type, so a row without it is skipped rather than
-  // highlighting the literal string "undefined".
-  const handles = new Set(
-    (members.data ?? []).map((m) => m.user?.username).filter((u): u is string => !!u),
-  );
+  // highlighting the literal string "undefined" — and the picker would otherwise offer a blank.
+  const mentionable: MentionPerson[] = (members.data ?? [])
+    .filter((m) => !!m.user)
+    .map((m) => ({
+      id: m.user!.id,
+      username: m.user!.username,
+      displayName: m.user!.displayName,
+      avatarUrl: m.user!.avatarUrl,
+    }));
+  const handles = new Set(mentionable.map((p) => p.username));
+
+  const { results, isOpen, handleTextChange, selectMention, closeMentions } = useMentions(mentionable);
+  const [highlighted, setHighlighted] = useState(0);
+  const draftRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => setHighlighted(0), [results]);
+
+  const applyMention = (index: number) => {
+    const person = results[index];
+    if (!person) return;
+    const { newText, newCursor } = selectMention(person, draft);
+    setDraft(newText);
+    requestAnimationFrame(() => {
+      draftRef.current?.focus();
+      draftRef.current?.setSelectionRange(newCursor, newCursor);
+    });
+  };
 
   const latest = page.data?.messages ?? [];
   const all = [...olderPages, ...latest];
@@ -260,21 +284,61 @@ export function ProjectChat({ projectId, canPost, canModerate }: { projectId: st
           className="border-t border-line bg-surface p-3"
         >
           <div className="flex items-end gap-2">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                // Enter sends, Shift+Enter makes a new line — what every chat does.
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  if (canSend) send.mutate();
-                }
-              }}
-              rows={2}
-              placeholder="Viết tin nhắn… gõ @tên để nhắc ai đó"
-              className="input max-h-32 min-h-[44px] flex-1 resize-y py-2 text-sm"
-              aria-label="Nội dung tin nhắn"
-            />
+            <div className="relative flex-1">
+              {isOpen && (
+                <MentionSuggestions
+                  people={results}
+                  highlighted={highlighted}
+                  onHighlight={setHighlighted}
+                  onPick={applyMention}
+                  className="absolute bottom-full left-0 mb-2"
+                />
+              )}
+              <textarea
+                ref={draftRef}
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  handleTextChange(e.target.value, e.target.selectionStart);
+                }}
+                onBlur={closeMentions}
+                onKeyDown={(e) => {
+                  // While the picker is open it owns the arrows and Enter. Sending on Enter here
+                  // would fire the message instead of choosing the person being pointed at.
+                  if (isOpen && results.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setHighlighted((h) => (h + 1) % results.length);
+                      return;
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setHighlighted((h) => (h - 1 + results.length) % results.length);
+                      return;
+                    }
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                      e.preventDefault();
+                      applyMention(highlighted);
+                      return;
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      closeMentions();
+                      return;
+                    }
+                  }
+                  // Enter sends, Shift+Enter makes a new line — what every chat does.
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (canSend) send.mutate();
+                  }
+                }}
+                rows={2}
+                placeholder="Viết tin nhắn… gõ @ để nhắc ai đó"
+                className="input max-h-32 min-h-[44px] w-full resize-y py-2 text-sm"
+                aria-label="Nội dung tin nhắn"
+              />
+            </div>
             <button type="submit" disabled={!canSend} className="btn-primary btn-icon" aria-label="Gửi tin nhắn">
               <Icon
                 icon={send.isPending ? 'ph:circle-notch' : 'ph:paper-plane-tilt-duotone'}

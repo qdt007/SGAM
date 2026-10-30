@@ -9,6 +9,7 @@ import { keys } from '../../constants/queryKeys';
 import { Comment } from '../../types';
 import { cn } from '../../utils/cn';
 import { CommentEditor } from './CommentEditor';
+import { MentionPerson } from '../../hooks/useMentions';
 import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog } from '../ui/Modal';
 
@@ -29,7 +30,16 @@ function CommentBody({ body }: { body: string }) {
   );
 }
 
-export function CommentList({ taskId, canComment = true }: { taskId: string; canComment?: boolean }) {
+export function CommentList({
+  taskId,
+  people,
+  canComment = true,
+}: {
+  taskId: string;
+  /** The task's project members — the only people an @handle resolves to. */
+  people: MentionPerson[];
+  canComment?: boolean;
+}) {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { on, off } = useSocket();
@@ -123,6 +133,7 @@ export function CommentList({ taskId, canComment = true }: { taskId: string; can
                   {editingId === c.id ? (
                     <div className="mt-2">
                       <CommentEditor
+                        people={people}
                         initialValue={c.body}
                         submitLabel="Save"
                         autoFocus
@@ -158,7 +169,7 @@ export function CommentList({ taskId, canComment = true }: { taskId: string; can
         </div>
       )}
 
-      {canComment && <CommentEditor onSubmit={(body) => create(body)} isPending={isCreating} />}
+      {canComment && <CommentEditor people={people} onSubmit={(body) => create(body)} isPending={isCreating} />}
 
       {pendingDelete && (
         <ConfirmDialog

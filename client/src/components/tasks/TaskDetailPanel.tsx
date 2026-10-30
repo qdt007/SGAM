@@ -279,7 +279,19 @@ export function TaskDetailPanel({
             </>
           )}
 
-          {tab === 'comments' && <CommentList taskId={taskId} />}
+          {tab === 'comments' && (
+            <CommentList
+              taskId={taskId}
+              people={(members ?? [])
+                .filter((m) => !!m.user)
+                .map((m) => ({
+                  id: m.user!.id,
+                  username: m.user!.username,
+                  displayName: m.user!.displayName,
+                  avatarUrl: m.user!.avatarUrl,
+                }))}
+            />
+          )}
           {tab === 'files' && <FileAttachments taskId={taskId} />}
           {tab === 'time' && <TaskTimer taskId={taskId} taskTitle={task?.title ?? ''} />}
         </div>

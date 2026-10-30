@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
-import { useMentions } from '../../hooks/useMentions';
-import { cn } from '../../utils/cn';
-import { Avatar } from '../ui/Avatar';
+import { useMentions, MentionPerson } from '../../hooks/useMentions';
+import { MentionSuggestions } from '../ui/MentionSuggestions';
 
 interface CommentEditorProps {
+  /** Who can be mentioned here — the task's project members, and nobody else. */
+  people: MentionPerson[];
   onSubmit: (body: string) => void;
   isPending?: boolean;
   initialValue?: string;
@@ -15,18 +16,19 @@ interface CommentEditorProps {
 }
 
 export function CommentEditor({
+  people,
   onSubmit,
   isPending,
   initialValue = '',
-  placeholder = 'Write a comment… use @ to mention someone',
-  submitLabel = 'Comment',
+  placeholder = 'Viết bình luận… gõ @ để nhắc ai đó',
+  submitLabel = 'Bình luận',
   onCancel,
   autoFocus,
 }: CommentEditorProps) {
   const [text, setText] = useState(initialValue);
   const [highlighted, setHighlighted] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { results, isOpen, handleTextChange, selectMention, closeMentions } = useMentions();
+  const { results, isOpen, handleTextChange, selectMention, closeMentions } = useMentions(people);
 
   useEffect(() => {
     if (autoFocus) textareaRef.current?.focus();
@@ -98,27 +100,14 @@ export function CommentEditor({
         className="input resize-y min-h-[76px]"
       />
 
-      {isOpen && results.length > 0 && (
-        <div className="absolute left-3 bottom-[72px] z-30 w-64 rounded-xl border border-black/[0.06] bg-raised shadow-modal overflow-hidden">
-          {results.map((u, i) => (
-            <button
-              key={u.id}
-              type="button"
-              onMouseEnter={() => setHighlighted(i)}
-              onClick={() => applyMention(i)}
-              className={cn(
-                'flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors',
-                i === highlighted ? 'bg-primary/10' : 'hover:bg-black/[0.03]',
-              )}
-            >
-              <Avatar name={u.displayName} src={u.avatarUrl} size="sm" />
-              <div className="min-w-0">
-                <p className="text-sm text-ink truncate">{u.displayName}</p>
-                <p className="text-xs text-ink-muted truncate">@{u.username}</p>
-              </div>
-            </button>
-          ))}
-        </div>
+      {isOpen && (
+        <MentionSuggestions
+          people={results}
+          highlighted={highlighted}
+          onHighlight={setHighlighted}
+          onPick={applyMention}
+          className="absolute bottom-[72px] left-3"
+        />
       )}
 
       <div className="mt-2 flex items-center justify-between">
@@ -126,7 +115,7 @@ export function CommentEditor({
         <div className="flex gap-2">
           {onCancel && (
             <button type="button" onClick={onCancel} className="btn-ghost text-sm px-3 py-1.5">
-              Cancel
+              Huỷ
             </button>
           )}
           <button
