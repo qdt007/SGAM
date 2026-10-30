@@ -111,12 +111,16 @@ function PlanCard({
   plan,
   cycle,
   current,
+  otherCycle,
   onChoose,
   savingPercent,
 }: {
   plan: PlanDefinition;
   cycle: BillingCycle;
+  /** This card is exactly what the viewer is on — same tier *and* same billing cycle. */
   current: boolean;
+  /** They are on this tier already, but paying for the other cycle. */
+  otherCycle: boolean;
   onChoose: () => void;
   savingPercent: number;
 }) {
@@ -128,7 +132,7 @@ function PlanCard({
       <div className="flex items-center gap-2">
         <h3 className="font-display text-subhead font-bold text-ink">{plan.name}</h3>
         {current && <span className="badge badge-success">Đang dùng</span>}
-        {isPro && !current && cycle === 'YEARLY' && savingPercent > 0 && (
+        {isPro && !current && !otherCycle && cycle === 'YEARLY' && savingPercent > 0 && (
           <span className="badge bg-primary/12 text-primary">-{savingPercent}%</span>
         )}
       </div>
@@ -155,7 +159,13 @@ function PlanCard({
 
       {isPro && (
         <button onClick={onChoose} disabled={current} className="btn-primary mt-6 w-full">
-          {current ? 'Gói hiện tại' : 'Nâng cấp lên Pro'}
+          {current
+            ? 'Gói hiện tại'
+            : otherCycle
+              ? // Already paying for Pro, just on the other cycle. "Nâng cấp" would be wrong:
+                // there is nothing above Pro to go up to.
+                `Chuyển sang gói ${cycle === 'YEARLY' ? 'năm' : 'tháng'}`
+              : 'Nâng cấp lên Pro'}
         </button>
       )}
       {!isPro && (
@@ -171,7 +181,9 @@ function PlanCard({
 export function BillingSection() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [cycle, setCycle] = useState<BillingCycle>('YEARLY');
+  // Null until they touch the switch; the subscription then decides what it opens on. Opening
+  // a monthly subscriber on the yearly tab showed them 499.000đ/năm badged "Đang dùng".
+  const [pickedCycle, setPickedCycle] = useState<BillingCycle | null>(null);
   const [checkout, setCheckout] = useState<BillingCycle | null>(null);
   const [error, setError] = useState('');
 
@@ -194,6 +206,10 @@ export function BillingSection() {
   }, [paymentResult, qc, searchParams, setSearchParams]);
 
   const { isPro, tier, subscription, usage, payments, isLoading } = usePlan();
+
+  // What the switch shows: their own cycle until they pick another, yearly for anyone with no
+  // subscription to read it from.
+  const cycle: BillingCycle = pickedCycle ?? subscription?.cycle ?? 'YEARLY';
 
   const banner =
     paymentResult === 'success'
@@ -295,7 +311,7 @@ export function BillingSection() {
           {(['MONTHLY', 'YEARLY'] as BillingCycle[]).map((c) => (
             <button
               key={c}
-              onClick={() => setCycle(c)}
+              onClick={() => setPickedCycle(c)}
               className={cn(
                 'rounded-lg px-3 py-1.5 text-small font-semibold transition-colors duration-150',
                 cycle === c ? 'bg-primary text-ink-onAccent' : 'text-ink-muted hover:text-ink',
@@ -317,7 +333,10 @@ export function BillingSection() {
             key={p.tier}
             plan={p}
             cycle={cycle}
-            current={p.tier === tier}
+            // "Đang dùng" has to mean the cycle too. Matching on tier alone badged the yearly
+            // card for somebody paying monthly, at a price they had never agreed to.
+            current={p.tier === tier && (p.tier === 'FREE' || subscription?.cycle === cycle)}
+            otherCycle={p.tier === 'PRO' && tier === 'PRO' && subscription?.cycle !== cycle}
             savingPercent={catalogue.yearlySavingPercent}
             onChoose={() => setCheckout(cycle)}
           />
