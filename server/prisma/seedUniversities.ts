@@ -97,7 +97,19 @@ const STUDENTS: Student[] = [
 ];
 
 const emailOf = (s: Student) => `${s.id}@${domainOf[s.uni]}`;
-const SEED_EMAILS = STUDENTS.map(emailOf);
+
+/**
+ * Cleanup matches on the **domain**, not on the current list of names.
+ *
+ * Matching the list looks right until the list shrinks: cutting this seed from 31 students to 15
+ * left the other 16 behind, because they were no longer named and so were never deleted — while
+ * their projects went, leaving sixteen accounts belonging to nothing and inflating the user count
+ * on the admin page.
+ *
+ * Two domains are listed that no current student uses. They were in an earlier version, and
+ * dropping them from here would strand anyone still holding one, which is the whole bug.
+ */
+const SEED_DOMAINS = [...UNIS.map((u) => u.domain), 'ued.udn.vn', 'donga.edu.vn'];
 
 /* ─── Shape of a project ─────────────────────────────────── */
 
@@ -510,7 +522,10 @@ const SEED_PROJECTS = PROJECTS.map((p) => p.name);
  * using the same ones. `ProjectTag` and `TaskTag` are what scope them, and those cascade.
  */
 async function clean(): Promise<number> {
-  const users = await prisma.user.findMany({ where: { email: { in: SEED_EMAILS } }, select: { id: true } });
+  const users = await prisma.user.findMany({
+    where: { OR: SEED_DOMAINS.map((d) => ({ email: { endsWith: `@${d}` } })) },
+    select: { id: true },
+  });
   const ids = users.map((u) => u.id);
 
   if (ids.length) {
