@@ -69,20 +69,12 @@ function CheckoutModal({ cycle, onClose }: { cycle: BillingCycle; onClose: () =>
           )}
         </div>
 
-        {session.data?.paymentUrl ? (
+        {session.data?.paymentUrl && (
           <div className="flex items-start gap-2 rounded-lg border border-line bg-sunken px-3 py-2.5 text-caption text-ink-muted">
             <Icon icon="ph:shield-check-fill" width={14} className="mt-px shrink-0 text-success" aria-hidden />
             <span>
               Bạn sẽ được chuyển sang <b>{gateway}</b> để thanh toán. Gói Pro chỉ được bật sau khi {gateway} xác
               nhận, nên đừng đóng trình duyệt giữa chừng.
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/[0.07] px-3 py-2.5 text-caption text-warning">
-            <Icon icon="ph:info-fill" width={14} className="mt-px shrink-0" aria-hidden />
-            <span>
-              Đây là giao dịch <b>thử nghiệm</b> — không có tiền nào được trừ. Gói Pro sẽ được kích hoạt ngay
-              để bạn trải nghiệm đầy đủ tính năng.
             </span>
           </div>
         )}
