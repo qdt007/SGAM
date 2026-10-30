@@ -130,19 +130,19 @@ function AccountMenu({ collapsed, onLogout }: { collapsed: boolean; onLogout: ()
       {open && (
         <div role="menu" className="menu absolute bottom-full left-0 mb-1.5 w-[230px]">
           <div className="flex items-center justify-between gap-2 px-3 py-2">
-            <span className="text-caption text-ink-subtle">Gói hiện tại</span>
+            <span className="text-caption text-ink-subtle">Current plan</span>
             <PlanBadge tier={tier} />
           </div>
           {!isPro && (
             <NavLink to="/settings?tab=billing" onClick={() => setOpen(false)} className="menu-item text-primary">
               <Icon icon="ph:sparkle-duotone" width={16} aria-hidden />
-              Nâng cấp lên Pro
+              Upgrade to Pro
             </NavLink>
           )}
           <div className="menu-separator" />
           <NavLink to="/settings" onClick={() => setOpen(false)} className="menu-item">
             <Icon icon="ph:gear-duotone" width={16} aria-hidden />
-            Cài đặt
+            Settings
           </NavLink>
           <button
             role="menuitem"
@@ -153,12 +153,12 @@ function AccountMenu({ collapsed, onLogout }: { collapsed: boolean; onLogout: ()
             className="menu-item"
           >
             <Icon icon={theme === 'dark' ? 'ph:sun-duotone' : 'ph:moon-duotone'} width={16} aria-hidden />
-            {theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối'}
+            {theme === 'dark' ? 'Light appearance' : 'Dark appearance'}
           </button>
           <div className="menu-separator" />
           <button role="menuitem" onClick={onLogout} className="menu-item text-danger hover:bg-danger/10">
             <Icon icon="ph:sign-out-duotone" width={16} aria-hidden />
-            Đăng xuất
+            Sign out
           </button>
         </div>
       )}
