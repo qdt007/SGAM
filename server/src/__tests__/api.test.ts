@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import app from '../app';
+import { twoFactorDisableSchema } from '../modules/auth/auth.schema';
 
 /**
  * Contract tests that never touch the database: auth rejection, validation and
@@ -157,5 +158,37 @@ describe('VNPay callbacks', () => {
   it('still requires a token to start a checkout', async () => {
     const res = await request(app).post('/api/billing/checkout').send({ cycle: 'MONTHLY' });
     expect(res.status).toBe(401);
+  });
+});
+
+describe('turning two-factor off', () => {
+  const UUID = '00000000-0000-0000-0000-000000000000';
+
+  it('refuses a request that carries neither proof', async () => {
+    const res = await request(app).post('/api/auth/2fa/disable').send({});
+    // 401 from the auth guard, or 422 from validation — never a success.
+    expect([401, 422]).toContain(res.status);
+  });
+
+  it('still sits behind the authenticate guard', async () => {
+    const res = await request(app).post('/api/auth/2fa/disable').send({ code: '123456' });
+    expect(res.status).toBe(401);
+  });
+
+  it('accepts a code in place of a password at the schema level', () => {
+    // A Google-created account has no password and no way to set a first one. Demanding one
+    // here let it switch 2FA on and never off — a door that locks behind you.
+    expect(twoFactorDisableSchema.safeParse({ code: '123456' }).success).toBe(true);
+    expect(twoFactorDisableSchema.safeParse({ password: 'hunter22' }).success).toBe(true);
+    expect(twoFactorDisableSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('takes a recovery code, which is longer than a TOTP', () => {
+    expect(twoFactorDisableSchema.safeParse({ code: 'A1B2C3D4E5' }).success).toBe(true);
+  });
+
+  it('rejects something too short to be either', () => {
+    expect(twoFactorDisableSchema.safeParse({ code: '12' }).success).toBe(false);
+    expect(twoFactorDisableSchema.safeParse({ password: '' }).success).toBe(false);
   });
 });

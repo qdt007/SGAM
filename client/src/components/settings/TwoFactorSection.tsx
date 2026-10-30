@@ -19,6 +19,8 @@ export function TwoFactorSection() {
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [disabling, setDisabling] = useState(false);
   const [password, setPassword] = useState('');
+  /** Proof for turning it off when the account has no password to give. */
+  const [disableCode, setDisableCode] = useState('');
   const [error, setError] = useState('');
 
   const { data: status } = useQuery({ queryKey: ['auth', '2fa'], queryFn: authApi.twoFactorStatus });
@@ -27,6 +29,7 @@ export function TwoFactorSection() {
     setSetup(null);
     setCode('');
     setPassword('');
+    setDisableCode('');
     setDisabling(false);
     setError('');
   };
@@ -50,8 +53,13 @@ export function TwoFactorSection() {
     onError: (e) => setError(apiMessage(e, 'That code is not right')),
   });
 
+  // A Google-created account has no password and no way to set a first one, so demanding one
+  // here would let it switch 2FA on and never off. It proves itself with a code instead.
+  const hasPassword = status?.hasPassword ?? true;
+
   const disable = useMutation({
-    mutationFn: () => authApi.twoFactorDisable(password),
+    mutationFn: () =>
+      authApi.twoFactorDisable(hasPassword ? { password } : { code: disableCode.trim() }),
     onSuccess: () => {
       reset();
       setBackupCodes(null);
@@ -116,21 +124,41 @@ export function TwoFactorSection() {
 
       {disabling && (
         <div className="space-y-2 border-t border-line-soft pt-3">
-          <p className="text-xs text-ink-muted">Enter your password to turn two-factor off.</p>
+          <p className="text-xs text-ink-muted">
+            {hasPassword
+              ? 'Nhập mật khẩu để tắt xác thực hai lớp.'
+              : 'Tài khoản này đăng nhập bằng Google nên không có mật khẩu. Nhập mã 6 số từ ứng dụng xác thực, hoặc một mã dự phòng.'}
+          </p>
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              autoFocus
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Your password"
-              className="input max-w-[220px] py-1 text-sm"
-            />
-            <button onClick={() => disable.mutate()} disabled={disable.isPending || !password} className="btn-primary py-1.5 text-sm">
-              {disable.isPending ? 'Turning off…' : 'Turn off'}
+            {hasPassword ? (
+              <input
+                autoFocus
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mật khẩu của bạn"
+                className="input max-w-[220px] py-1 text-sm"
+              />
+            ) : (
+              <input
+                autoFocus
+                inputMode="text"
+                autoComplete="one-time-code"
+                value={disableCode}
+                onChange={(e) => setDisableCode(e.target.value)}
+                placeholder="Mã 6 số hoặc mã dự phòng"
+                className="input max-w-[220px] py-1 text-sm tracking-widest"
+              />
+            )}
+            <button
+              onClick={() => disable.mutate()}
+              disabled={disable.isPending || (hasPassword ? !password : disableCode.trim().length < 6)}
+              className="btn-primary py-1.5 text-sm"
+            >
+              {disable.isPending ? 'Đang tắt…' : 'Tắt'}
             </button>
             <button onClick={reset} className="btn-ghost py-1.5 text-sm">
-              Cancel
+              Huỷ
             </button>
           </div>
         </div>

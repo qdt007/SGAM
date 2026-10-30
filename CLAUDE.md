@@ -131,8 +131,14 @@ Things worth knowing before you change them:
   without re-encoding. `URLSearchParams` escapes `!'()*` differently and every difference comes
   back as "Sai chữ ký".
 - **A password is not always present.** `User.passwordHash` is nullable because a Google-created
-  account never had one. Password login, password change and 2FA-disable all say so by name
-  rather than failing with "invalid credentials".
+  account never had one. Password login and password change say so by name rather than failing
+  with "invalid credentials".
+- **Turning 2FA off takes a password, or the second factor itself when there is no password.**
+  There is no route to set a *first* password, so requiring one to disable meant a Google account
+  could switch 2FA on and never off — a one-way door. `disableTwoFactor` now takes a current TOTP
+  or a recovery code instead, through the same `consumeTwoFactorCode` the login challenge uses,
+  so the two cannot disagree about what counts as proof. `GET /auth/2fa` returns `hasPassword`
+  purely so Settings knows which field to show.
 - **Two tokens share the access secret**, so `verifyAccessToken` rejects anything carrying a
   `purpose` claim. Without that a 2FA challenge — handed out *before* the second factor — would
   authenticate as a session. Same for the OAuth `state`.

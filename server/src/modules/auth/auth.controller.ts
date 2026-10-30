@@ -30,7 +30,7 @@ export const twoFactorEnable = asyncHandler(async (req: Request, res: Response) 
 });
 
 export const twoFactorDisable = asyncHandler(async (req: Request, res: Response) => {
-  await authService.disableTwoFactor(req.user!.userId, req.body.password);
+  await authService.disableTwoFactor(req.user!.userId, req.body);
   success(res, { message: 'Two-factor authentication is off.' });
 });
 

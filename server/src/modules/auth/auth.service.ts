@@ -118,19 +118,73 @@ export async function enableTwoFactor(userId: string, token: string) {
   return { backupCodes: codes };
 }
 
-/** Turning 2FA off needs the password, so a borrowed open session cannot weaken the account. */
-export async function disableTwoFactor(userId: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
+/**
+ * Turning 2FA off has to cost something, so a borrowed open session cannot quietly weaken the
+ * account. A password is that cost — **when the account has one.**
+ *
+ * A Google-created account never had a password, and there is no way to set a first one, so
+ * demanding it here meant such an account could switch 2FA on and then never switch it off: a
+ * one-way door with no key on the far side. For those accounts the second factor itself is the
+ * proof — a current TOTP or an unused recovery code. That is the same thing the login challenge
+ * accepts, so it is no weaker than the door 2FA already guards.
+ */
+export async function disableTwoFactor(userId: string, input: { password?: string; code?: string }) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
-  if (!user.passwordHash) {
-    throw Object.assign(new Error('This account has no password. Set one before turning 2FA off.'), { status: 409 });
+
+  if (user.passwordHash) {
+    if (!input.password) {
+      throw Object.assign(new Error('Enter your password to turn this off'), { status: 400 });
+    }
+    if (!(await comparePassword(input.password, user.passwordHash))) {
+      throw Object.assign(new Error('That password is not right'), { status: 400 });
+    }
+  } else {
+    if (!input.code) {
+      throw Object.assign(
+        new Error('This account signs in with Google. Enter a code from your authenticator app instead.'),
+        { status: 400 },
+      );
+    }
+    await consumeTwoFactorCode(user, input.code);
   }
-  if (!(await comparePassword(password, user.passwordHash))) {
-    throw Object.assign(new Error('That password is not right'), { status: 400 });
-  }
+
   await prisma.user.update({
     where: { id: userId },
     data: { twoFactorEnabled: false, twoFactorSecret: null, twoFactorBackupCodes: [] },
+  });
+}
+
+/**
+ * Accepts a current TOTP, or one recovery code which is then burned. Throws if neither matches.
+ *
+ * Shared by the login challenge and by turning 2FA off without a password, so the two can never
+ * disagree about what counts as proof.
+ */
+async function consumeTwoFactorCode(
+  user: { id: string; twoFactorSecret: string | null; twoFactorBackupCodes: string[] },
+  code: string,
+) {
+  if (!user.twoFactorSecret) throw Object.assign(new Error('Two-factor is not set up'), { status: 400 });
+
+  const cleaned = code.replace(/\s/g, '');
+  // verifySync throws TokenLengthError on anything that is not six digits rather than returning
+  // invalid, so only hand it a TOTP-shaped code and treat everything else as a recovery code.
+  const looksLikeTotp = /^\d{6}$/.test(cleaned);
+  const totpAccepted =
+    looksLikeTotp && verifySync({ token: cleaned, secret: user.twoFactorSecret, epochTolerance: TOTP_TOLERANCE_SECONDS }).valid;
+  if (totpAccepted) return;
+
+  const upper = cleaned.toUpperCase();
+  let matched = -1;
+  for (let i = 0; i < user.twoFactorBackupCodes.length; i++) {
+    if (await comparePassword(upper, user.twoFactorBackupCodes[i])) { matched = i; break; }
+  }
+  if (matched === -1) throw Object.assign(new Error('That code is not right'), { status: 401 });
+  // Single use: drop the one that was just spent.
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { twoFactorBackupCodes: user.twoFactorBackupCodes.filter((_, i) => i !== matched) },
   });
 }
 
@@ -148,26 +202,7 @@ export async function verifyTwoFactorLogin(challengeToken: string, code: string)
     throw Object.assign(new Error('Invalid credentials'), { status: 401 });
   }
 
-  const cleaned = code.replace(/\s/g, '');
-  // verifySync throws TokenLengthError on anything that is not six digits rather than returning
-  // invalid, so only hand it a TOTP-shaped code and treat everything else as a recovery code.
-  const looksLikeTotp = /^\d{6}$/.test(cleaned);
-  const totpAccepted =
-    looksLikeTotp && verifySync({ token: cleaned, secret: user.twoFactorSecret, epochTolerance: TOTP_TOLERANCE_SECONDS }).valid;
-
-  if (!totpAccepted) {
-    const upper = cleaned.toUpperCase();
-    let matched = -1;
-    for (let i = 0; i < user.twoFactorBackupCodes.length; i++) {
-      if (await comparePassword(upper, user.twoFactorBackupCodes[i])) { matched = i; break; }
-    }
-    if (matched === -1) throw Object.assign(new Error('That code is not right'), { status: 401 });
-    // Single use: drop the one that was just spent.
-    await prisma.user.update({
-      where: { id: userId },
-      data: { twoFactorBackupCodes: user.twoFactorBackupCodes.filter((_, i) => i !== matched) },
-    });
-  }
+  await consumeTwoFactorCode(user, code);
 
   const tokens = await issueTokens(user.id, user.globalRole);
   return { user: toSafeUser(user), ...tokens };
@@ -177,10 +212,16 @@ export async function verifyTwoFactorLogin(challengeToken: string, code: string)
 export async function getTwoFactorStatus(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { twoFactorEnabled: true, twoFactorBackupCodes: true },
+    select: { twoFactorEnabled: true, twoFactorBackupCodes: true, passwordHash: true },
   });
   if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
-  return { enabled: user.twoFactorEnabled, backupCodesLeft: user.twoFactorBackupCodes.length };
+  return {
+    enabled: user.twoFactorEnabled,
+    backupCodesLeft: user.twoFactorBackupCodes.length,
+    // Settings needs this to ask for the right thing when turning 2FA off. It says only whether
+    // a password exists, never anything about it.
+    hasPassword: !!user.passwordHash,
+  };
 }
 
 /* ─── Google sign-in ─────────────────────────────────────── */

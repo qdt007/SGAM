@@ -7,7 +7,12 @@ interface AuthResponse {
   refreshToken: string;
 }
 
-export interface TwoFactorStatus { enabled: boolean; backupCodesLeft: number }
+export interface TwoFactorStatus {
+  enabled: boolean;
+  backupCodesLeft: number;
+  /** False for a Google-created account, which never had one — it must prove itself with a code. */
+  hasPassword: boolean;
+}
 export interface TwoFactorSetup { secret: string; otpauthUrl: string; qrDataUrl: string }
 /** Login either finishes, or stops and asks for the second factor. */
 export type SignInResult =
@@ -21,8 +26,9 @@ export const authApi = {
   twoFactorSetup: async (): Promise<TwoFactorSetup> => (await api.post('/auth/2fa/setup')).data.data,
   twoFactorEnable: async (token: string): Promise<{ backupCodes: string[] }> =>
     (await api.post('/auth/2fa/enable', { token })).data.data,
-  twoFactorDisable: async (password: string): Promise<void> => {
-    await api.post('/auth/2fa/disable', { password });
+  /** Send whichever proof the account can give: a password, or a 2FA code when it has none. */
+  twoFactorDisable: async (proof: { password?: string; code?: string }): Promise<void> => {
+    await api.post('/auth/2fa/disable', proof);
   },
   twoFactorVerify: async (challengeToken: string, code: string): Promise<SignInResult> =>
     (await api.post('/auth/2fa/verify', { challengeToken, code })).data.data,

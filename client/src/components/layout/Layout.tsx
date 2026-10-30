@@ -140,6 +140,10 @@ function AccountMenu({ collapsed, onLogout }: { collapsed: boolean; onLogout: ()
             </NavLink>
           )}
           <div className="menu-separator" />
+          <NavLink to="/settings" onClick={() => setOpen(false)} className="menu-item">
+            <Icon icon="ph:gear-duotone" width={16} aria-hidden />
+            Cài đặt
+          </NavLink>
           <button
             role="menuitem"
             onClick={() => {
@@ -149,12 +153,12 @@ function AccountMenu({ collapsed, onLogout }: { collapsed: boolean; onLogout: ()
             className="menu-item"
           >
             <Icon icon={theme === 'dark' ? 'ph:sun-duotone' : 'ph:moon-duotone'} width={16} aria-hidden />
-            {theme === 'dark' ? 'Light appearance' : 'Dark appearance'}
+            {theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối'}
           </button>
           <div className="menu-separator" />
           <button role="menuitem" onClick={onLogout} className="menu-item text-danger hover:bg-danger/10">
             <Icon icon="ph:sign-out-duotone" width={16} aria-hidden />
-            Sign out
+            Đăng xuất
           </button>
         </div>
       )}

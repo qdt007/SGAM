@@ -18,9 +18,19 @@ export const twoFactorVerifySchema = z.object({
   // Either a 6-digit TOTP or a 10-character recovery code, so this only rejects obvious junk.
   code: z.string().min(6).max(20),
 });
-export const twoFactorDisableSchema = z.object({
-  password: z.string().min(1, 'Enter your password to turn this off'),
-});
+/**
+ * Either proof is acceptable, and which one applies depends on the account: a Google-created one
+ * has no password, so the second factor itself is what authorises turning the second factor off.
+ * The service decides which it will take; this only rejects a request carrying neither.
+ */
+export const twoFactorDisableSchema = z
+  .object({
+    password: z.string().min(1).optional(),
+    code: z.string().min(6).max(20).optional(),
+  })
+  .refine((v) => !!v.password || !!v.code, {
+    message: 'Enter your password, or a code from your authenticator app',
+  });
 export type TwoFactorTokenInput = z.infer<typeof twoFactorTokenSchema>;
 export type TwoFactorVerifyInput = z.infer<typeof twoFactorVerifySchema>;
 export type TwoFactorDisableInput = z.infer<typeof twoFactorDisableSchema>;
