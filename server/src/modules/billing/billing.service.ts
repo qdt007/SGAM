@@ -4,7 +4,13 @@ import prisma from '../../config/db';
 import { PLANS, priceFor, periodEndFrom, limitsFor, yearlySavingPercent } from '../../constants/plans';
 import { CheckoutInput, ConfirmInput } from './billing.schema';
 import { buildPaymentUrl, verifyCallback, vnpayConfigured } from '../../config/vnpay';
-import { createPaymentLink, payosConfigured, verifyWebhook, type WebhookData } from '../../config/payos';
+import {
+  createPaymentLink,
+  getPaymentStatus,
+  payosConfigured,
+  verifyWebhook,
+  type WebhookData,
+} from '../../config/payos';
 import type { Webhook } from '@payos/node';
 import { env } from '../../utils/env';
 
@@ -72,8 +78,34 @@ export async function resolveTier(userId: string): Promise<PlanTier> {
   return 'PRO';
 }
 
+/**
+ * Clears a payOS order that was paid but never confirmed, if the caller has one outstanding.
+ *
+ * The return URL already reconciles, but it only runs if the customer actually lands back on
+ * it — close the tab at the bank's screen and they never do. Opening the billing page is the
+ * other moment they are certainly looking, so it is the other place worth checking.
+ *
+ * Bounded to the last day and to PENDING rows, so the ordinary case costs one indexed query and
+ * no network call at all.
+ */
+async function settleStalePayos(userId: string) {
+  if (!payosConfigured()) return;
+  const stale = await prisma.payment.findFirst({
+    where: {
+      userId,
+      provider: PAYOS_PROVIDER,
+      status: 'PENDING',
+      createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { providerRef: true },
+  });
+  if (stale) await reconcilePayos(stale.providerRef);
+}
+
 /** Subscription plus the numbers the UI needs to draw usage bars. */
 export async function getMine(userId: string) {
+  await settleStalePayos(userId);
   const tier = await resolveTier(userId);
   const sub = await ensureSubscription(userId);
   const limits = limitsFor(tier);
@@ -336,21 +368,76 @@ export async function handlePayosWebhook(body: unknown): Promise<WebhookReply> {
 }
 
 /**
- * Read-only view for the page the customer lands back on; it never grants anything. payOS does
- * not sign the return query, so anyone can type it — `settled` comes from our own row, which
- * only the webhook can have written.
+ * Settles an order by asking payOS what happened to it, rather than waiting to be told.
+ *
+ * A webhook is a delivery, and deliveries are lost — the server can be mid-deploy, the callback
+ * can be unregistered, the network can drop it. When it is the *only* way a payment becomes a
+ * subscription, a lost one leaves somebody who paid real money with nothing and no way to fix it
+ * themselves. This is the other direction: we hold the order code, so we can ask.
+ *
+ * **This does not weaken the rule that a browser cannot grant Pro.** Nothing here trusts the
+ * query string; the browser supplies an order code and every fact comes back from payOS over an
+ * authenticated server-to-server call. The redirect is a prompt to go and check, not evidence.
+ *
+ * Safe to call repeatedly: an order already PAID returns `alreadySettled` without touching it.
+ */
+export async function reconcilePayos(orderCodeRaw: string): Promise<{
+  found: boolean;
+  settled: boolean;
+  alreadySettled?: boolean;
+  remoteStatus?: string;
+}> {
+  if (!payosConfigured()) return { found: false, settled: false };
+
+  const payment = await prisma.payment.findUnique({
+    where: { providerRef: orderCodeRaw },
+    select: { id: true, userId: true, status: true, cycle: true, amount: true },
+  });
+  if (!payment) return { found: false, settled: false };
+  if (payment.status === 'PAID') return { found: true, settled: true, alreadySettled: true };
+
+  const orderCode = Number(orderCodeRaw);
+  if (!Number.isSafeInteger(orderCode)) return { found: true, settled: false };
+
+  let remote;
+  try {
+    remote = await getPaymentStatus(orderCode);
+  } catch (err) {
+    // payOS being unreachable is not evidence of anything, so nothing changes.
+    console.warn('[payOS] could not read order', orderCodeRaw, '-', (err as Error)?.message ?? err);
+    return { found: true, settled: false };
+  }
+
+  // `amountPaid` rather than `amount`: payOS reports a partial transfer as UNDERPAID, and a
+  // short payment must not buy a full period.
+  if (remote.status !== 'PAID' || remote.amountPaid < payment.amount) {
+    return { found: true, settled: false, remoteStatus: remote.status };
+  }
+
+  await activatePro(payment.userId, payment.id, payment.cycle);
+  console.log('[payOS] order', orderCodeRaw, 'settled by reconciliation, not by webhook');
+  return { found: true, settled: true, remoteStatus: remote.status };
+}
+
+/**
+ * What the page the customer lands back on is told.
+ *
+ * payOS does not sign the return query, so none of it is believed. What it does do is tell us
+ * *which* order to go and ask about — and that ask is `reconcilePayos`, which is why a customer
+ * whose webhook never arrived still ends up with the plan they paid for by the time the page
+ * finishes loading.
  */
 export async function readPayosReturn(query: Record<string, string>) {
   const ref = query.orderCode ?? '';
-  const payment = ref
-    ? await prisma.payment.findUnique({ where: { providerRef: ref }, select: { status: true } })
-    : null;
   const cancelled = query.cancel === 'true' || query.status === 'CANCELLED';
+
+  // No point asking payOS about an order the customer just abandoned.
+  const reconciled = ref && !cancelled ? await reconcilePayos(ref) : { settled: false };
+
   return {
     cancelled,
     succeeded: !cancelled && query.code === '00' && query.status === 'PAID',
-    // The webhook usually lands first, but not always; the page says "processing" rather than lying.
-    settled: payment?.status === 'PAID',
+    settled: reconciled.settled,
     providerRef: ref,
   };
 }

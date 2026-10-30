@@ -1,4 +1,4 @@
-import { PayOS, type CreatePaymentLinkResponse, type Webhook, type WebhookData } from '@payos/node';
+import { PayOS, type CreatePaymentLinkResponse, type PaymentLink, type Webhook, type WebhookData } from '@payos/node';
 import { env } from '../utils/env';
 
 /**
@@ -71,6 +71,17 @@ export async function createPaymentLink(input: PaymentLinkInput): Promise<Create
   });
 }
 
+/**
+ * Asks payOS what actually happened to an order.
+ *
+ * This is the authority a missed webhook leaves you without. The call is server-to-server and
+ * authenticated with our own keys, so its answer is trustworthy in a way a browser redirect
+ * never is — which is what makes it safe to grant on.
+ */
+export async function getPaymentStatus(orderCode: number): Promise<PaymentLink> {
+  return payos().paymentRequests.get(orderCode);
+}
+
 /** Resolves to the payload only when the signature checks out; throws otherwise. */
 export async function verifyWebhook(body: Webhook): Promise<WebhookData> {
   return payos().webhooks.verify(body);
@@ -85,4 +96,4 @@ export async function registerWebhook(url: string) {
   return payos().webhooks.confirm(url);
 }
 
-export type { WebhookData };
+export type { WebhookData, PaymentLink };

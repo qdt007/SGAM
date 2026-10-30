@@ -109,8 +109,16 @@ Things worth knowing before you change them:
   with a used code is an error, so `checkoutPayos` mints a fresh one every time and marks the
   previous PENDING rows FAILED. `description` is capped at 9 characters for unlinked bank
   accounts, and payOS sends amounts in whole dong where VNPay multiplies by 100.
-- **Only the server-to-server callback grants Pro** — `POST /api/billing/payos/webhook` for
-  payOS, `GET /api/billing/vnpay/ipn` for VNPay. Both are unauthenticated by necessity (neither
+- **A webhook is a delivery, and deliveries are lost.** `reconcilePayos` asks payOS what
+  happened to an order instead of waiting to be told, and it runs from two places a customer is
+  certainly present: the return URL, and `getMine` when they have a PENDING payOS order under a
+  day old. Without it a missed callback leaves somebody who paid real money with no plan and no
+  way to fix it — which is exactly what happened once here. It grants on `amountPaid`, not
+  `amount`, so a partial transfer (payOS reports UNDERPAID) cannot buy a full period.
+- **Only a server-to-server fact grants Pro** — `POST /api/billing/payos/webhook` for
+  payOS, `GET /api/billing/vnpay/ipn` for VNPay, or `reconcilePayos` asking payOS directly.
+  Reconciling from the return URL is not an exception to this: the browser supplies an order
+  code and nothing else, and every fact comes back over an authenticated call to payOS. Both are unauthenticated by necessity (neither
   gateway has a session) and neither trusts anything before the signature verifies. The browser
   return URLs only report. **The payOS webhook answers 2xx for
   everything, including a payload whose signature does not verify** — it logs that and acts on it
